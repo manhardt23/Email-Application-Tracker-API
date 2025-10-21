@@ -1,4 +1,4 @@
-from DB.models import Base, get_engine, ApplicationEmail
+from DB.models import Base, get_engine
 
 def init_db():
     engine = get_engine()
