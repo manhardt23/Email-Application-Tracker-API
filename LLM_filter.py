@@ -2,55 +2,57 @@ import ollama
 import re
 import json
 from quick_filter import quick_filter
+class Filter:
 
-model_name = "llama3"
+    def analyze_email_with_llama3(sender, subject, email_content): #Returns json
+        model_name = "llama3"
+        #check with quick filter first to save time
+        if not quick_filter(subject, email_content):
+            return 
 
-def analyze_email_with_llama3(sender, subject, email_content):
-    #check with quick filter first to save time
-    if not quick_filter(subject, email_content):
-        return 
+        # Construct your structured prompt
+        prompt = f"""
+        Analyze this email and determine:
+        1. Is this related to a job application? (yes/no)
+        2. If yes, what stage? (applied/rejected/interview/offer/assessment/other)
+        3. Company name (if identifiable)
+        4. Position title (if mentioned)
 
-    # Construct your structured prompt
-    prompt = f"""
-    Analyze this email and determine:
-    1. Is this related to a job application? (yes/no)
-    2. If yes, what stage? (applied/rejected/interview/offer/assessment/other)
-    3. Company name (if identifiable)
-    4. Position title (if mentioned)
+        Email:
+        From: {sender}
+        Subject: {subject}
+        Body: {email_content[:2000]}
 
-    Email:
-    From: {sender}
-    Subject: {subject}
-    Body: {email_content[:2000]}
-
-    Respond in JSON format:
-    {{
-        "is_application": boolean,
-        "stage": "string or null",
-        "company": "string or null",
-        "position": "string or null",
-        "confidence": "high/medium/low"
-    }}
-    """
-
-
-    # Send to Ollama
-    response = ollama.chat(
-    model=model_name,
-    messages=[{"role": "user", "content": prompt}])
-
-    content = response['message']['content']
+        Respond in JSON format:
+        {{
+            "is_application": boolean,
+            "stage": "string or null",
+            "company": "string or null",
+            "position": "string or null",
+            "confidence": "high/medium/low"
+        }}
+        """
 
 
+        # Send to Ollama
+        response = ollama.chat(
+        model=model_name,
+        messages=[{"role": "user", "content": prompt}])
 
-    # Use regex to safely find the JSON block
-    match = re.search(r'\{.*\}', content, re.DOTALL)
-    if match:
-            analysis = json.loads(match.group(0))
-    else:
-        print("No JSON found. Raw content:\n", content)
-    #print(content)
-    return analysis
+        content = response['message']['content']
+
+
+
+        # Use regex to safely find the JSON block
+        match = re.search(r'\{.*\}', content, re.DOTALL)
+        if match:
+                analysis = json.loads(match.group(0))
+        else:
+            print("No JSON found. Raw content:\n", content)
+        #print(content)
+            
+        #returns a json
+        return analysis
 
 
 if __name__ == "__main__":
@@ -69,7 +71,7 @@ Please note that if you wish to permanently remove your data from our system, yo
 
 Additionally, direct replies to this message are undeliverable and will not reach the Talent Acquisition Team. Please do not reply to this message.
     """
-    analysis = analyze_email_with_llama3(
+    analysis = Filter.analyze_email_with_llama3(
         sender="unisys@myworkday.com",
         subject="Your Job Application to Unisys - Student Technical",
         email_content=sample_email

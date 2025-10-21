@@ -6,11 +6,7 @@ def main():
     log = build_application_log(emails)
 
     print("Job Application Tracker:")
-    for entry in log:
-        print(f"- From: {entry['from']}")
-        print(f"  Subject: {entry['subject']}")
-        print(f"  Status: {entry['status']}")
-        print("")
+    print(f"{log[0]}")
 
 if __name__ == "__main__":
     main()
