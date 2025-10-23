@@ -4,8 +4,6 @@ import re
 from bs4 import BeautifulSoup
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
-
-from bleach import clean
 from config import EMAIL_USER, EMAIL_PASS, IMAP_SERVER
 
 def connect_to_inbox():
@@ -67,8 +65,7 @@ def fetch_recent_emails(limit=5):
                 body = re.sub(r"(?i)unsubscribe.*", "", body) # remove unsubscribe lines
                 body = body.strip()
 
-                # --- Limit to preview length ---
-                preview = body[:500] + ("..." if len(body) > 500 else "")
+                
                 emails.append({
                     "uid": uid.decode(),
                     "sender": sender,

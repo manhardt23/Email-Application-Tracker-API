@@ -13,7 +13,7 @@ class Filter:
         # Construct your structured prompt
         prompt = f"""
         Analyze this email and determine:
-        1. Is this related to a job application? (yes/no)
+        1. Is this related to a job application process? (yes/no)
         2. If yes, what stage? (applied/rejected/interview/offer/assessment/other)
         3. Company name (if identifiable)
         4. Position title (if mentioned)
