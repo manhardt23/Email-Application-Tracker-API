@@ -6,7 +6,7 @@ JOB_KEYWORDS = [
     "application", "applied", "position", "hiring", "interview",
     "offer", "recruiter", "recruitment", "career", "assessment",
     "candidate", "resume", "cv", "job", "role", "opening",
-    "opportunity", "thank you for applying"
+    "opportunity", "thank you for applying", "software", "engineering", "backend"
 ]
 
 def quick_filter(subject, email_content):

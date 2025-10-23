@@ -1,6 +1,5 @@
 from LLM_filter import Filter
 from email_client import fetch_recent_emails
-import json
 
 
 class Email_Data:
@@ -45,3 +44,31 @@ class Email_Data:
             "stage": self.stage,
             "confidence": self.confidence
         }
+
+
+class Email_Processor:
+    def __init__(self) -> None:
+        self.email_list = []
+        self.application_emails = []
+
+    def fetch_emails(self):
+        raw_emails = fetch_recent_emails()
+
+        for raw_email in raw_emails:
+            email = Email_Data(
+                uid=raw_email["uid"],
+                sender=raw_email["sender"],
+                subject=raw_email["subject"],
+                date=raw_email["date"]
+            )
+            self.email_list.append(email)
+        return self.email_list
+    
+    def get_application_emails(self):
+        return self.application_emails
+
+    def get_high_confidence_emails(self):
+        return [email for email in self.application_emails if email.confidence == "high"]
+    
+    def get_emails_needing_review(self):
+        return [email for email in self.application_emails if email.needs_review()]
