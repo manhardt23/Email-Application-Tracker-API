@@ -52,7 +52,8 @@ class Filter:
         #print(content)
             
         #returns a json
-        return analysis
+        if isinstance(analysis, dict):
+             return analysis
 
 
 if __name__ == "__main__":
