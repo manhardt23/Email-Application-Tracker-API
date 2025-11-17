@@ -14,7 +14,7 @@ def connect_to_inbox():
 
 
 
-def fetch_recent_emails(limit=5):
+def fetch_recent_emails(limit):
     mail = connect_to_inbox()
     status, data = mail.uid('search', None, "ALL")
     mail_uids = data[0].split()

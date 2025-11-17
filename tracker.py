@@ -66,8 +66,8 @@ class Email_Processor:
         self.email_list = []
         self.application_emails = []
 
-    def fetch_emails(self):
-        raw_emails = fetch_recent_emails()
+    def fetch_emails(self, limit):
+        raw_emails = fetch_recent_emails(limit)
 
         for raw_email in raw_emails:
             email = Email_Data(
@@ -99,7 +99,7 @@ class Email_Processor:
         return [email for email in self.application_emails if email.confidence == "high"]
     
     def get_emails_needing_review(self):
-        return [email for email in self.application_emails if email.needs_review()]
+        return [email for email in self.application_emails if email.need_review()]
     
 
 
@@ -130,7 +130,7 @@ class Log_DB:
             detected_stage=email_data.stage,
             is_application=email_data.is_application,
             confidence=email_data.confidence,
-            needs_review=email_data.needs_review()
+            needs_review=email_data.need_review()
         )
 
         if (email_data.confidence in ["high", "medium"] and email_data.company and email_data.position):
@@ -141,7 +141,7 @@ class Log_DB:
 
             email_record.application_id = application.id
 
-            self.update_application_stage(email_data.stage, email_data.date)
+            self.update_application_stage(application,email_data.stage, email_data.date)
 
             self.session.add(email_record)
             self.session.commit()
@@ -159,18 +159,19 @@ class Log_DB:
 
     def find_or_create_company(self, company_name):
         company = self.session.query(models.Company).filter(
-            func.lower(models.Company) == company_name.lower()
+            func.lower(models.Company.name) == company_name.lower()
         ).first()
 
         if not company:
             company = models.Company(name=company_name)
             self.session.add(company)
-            self.session.flush
+            self.session.flush()
 
         return company
 
     def find_or_create_application(self, company, position):
         application = self.session.query(models.Application).filter(
+            models.Application.company_id == company.id,
             func.lower(models.Application.position) == position.lower() 
         ).first()
 
@@ -200,12 +201,12 @@ class Log_DB:
 
 # main_pipeline.py
 
-def main():
+def main(limit):
     print("=== Job Application Email Pipeline ===\n")
     
     # Step 1: Fetch and analyze emails
     processor = Email_Processor()
-    processor.fetch_emails()
+    processor.fetch_emails(limit)
     processor.analyze_emails()
     
     # Step 2: Get application emails
@@ -222,10 +223,11 @@ def main():
     
     # Step 4: Show summary
     print("\n=== Summary ===")
-    print(f"Total emails processed: {len(processor.emails)}")
-    print(f"Application emails found: {len(application_emails)}")
+    print(f"Total emails processed: {len(processor.email_list)}")
+    print(f"Application emails found: {len(processor.application_emails)}")
     print(f"High confidence: {len(processor.get_high_confidence_emails())}")
     print(f"Needs review: {len(processor.get_emails_needing_review())}")
 
 if __name__ == "__main__":
-    main()
+    import config
+    main(config.get_email_limit())
