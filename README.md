@@ -56,20 +56,147 @@ Eventually, introduce support for Gmail or Outlook and add a web dashboard using
 
 ---
 
-### ⚙️ Technologies I Plan to Use
+### ⚙️ Technologies Used
 - **Python** – main backend language  
 - **FastAPI** – API framework  
-- **MongoDB** / **Firestore** – database for structured records  
-- **imaplib / mailparser** – email access and parsing  
-- **Render / Railway** – for hosting the backend  
+- **SQLAlchemy** – ORM for database operations  
+- **SQLite/PostgreSQL** – database for structured records (via SQLAlchemy)  
+- **imaplib** – email access via IMAP  
+- **LLM (Llama3)** – intelligent email classification and extraction  
+- **python-dotenv** – environment variable management  
 
 ---
 
 ### 📅 Current Phase
-Currently in the **planning and prototyping** stage — focusing on:
-- Establishing secure IMAP connection with Comcast  
-- Designing data model and parsing logic  
-- Structuring FastAPI endpoints  
+**API Development Complete** — The following features have been implemented:
+
+✅ **Email Processing Pipeline**
+- IMAP connection to Comcast email
+- LLM-powered email analysis to extract company, position, and application stage
+- Automatic database storage with confidence scoring
+- Email deduplication and review flagging
+
+✅ **Database Models**
+- `Company` – stores company information
+- `Application` – tracks job applications with stages (applied, interview, offer, rejected, etc.)
+- `ApplicationEmail` – stores email metadata and LLM-extracted information
+
+✅ **REST API Endpoints**
+- `GET /api/v1/` – API root endpoint
+- `GET /api/v1/emails` – retrieve all application emails
+- `POST /api/v1/run` – trigger email processing pipeline with optional limit
+- `GET /api/v1/config/limit` – get current default email processing limit
+- `PUT /api/v1/config/limit` – update default email processing limit
+- `GET /api/v1/status` – get API health and pipeline statistics
+
+---
+
+### 🚀 API Documentation
+
+#### Run Email Tracker Pipeline
+**POST** `/api/v1/run?limit=<number>`
+
+Runs the email tracker pipeline to fetch, analyze, and store application emails.
+
+- **Query Parameters:**
+  - `limit` (optional): Number of emails to process. If not provided, uses default from config.
+
+- **Response:**
+```json
+{
+  "status": "success",
+  "message": "Processed 10 emails",
+  "statistics": {
+    "total_emails_in_db": 45,
+    "total_applications": 12,
+    "total_companies": 8
+  }
+}
+```
+
+#### Get Default Email Limit
+**GET** `/api/v1/config/limit`
+
+Returns the current default email processing limit.
+
+- **Response:**
+```json
+{
+  "limit": 10
+}
+```
+
+#### Update Default Email Limit
+**PUT** `/api/v1/config/limit`
+
+Updates the default email processing limit (persisted to `.env` file).
+
+- **Request Body:**
+```json
+{
+  "limit": 20
+}
+```
+
+- **Response:**
+```json
+{
+  "status": "success",
+  "message": "Limit updated to 20",
+  "limit": 20
+}
+```
+
+#### Get System Status
+**GET** `/api/v1/status`
+
+Returns API health status and comprehensive pipeline statistics.
+
+- **Response:**
+```json
+{
+  "status": "healthy",
+  "api": {
+    "version": "v1",
+    "status": "operational"
+  },
+  "statistics": {
+    "total_emails": 45,
+    "total_applications": 12,
+    "total_companies": 8,
+    "emails_needing_review": 3,
+    "applications_by_stage": {
+      "applied": 5,
+      "interview": 4,
+      "offer": 2,
+      "rejected": 1
+    },
+    "emails_by_confidence": {
+      "high": 30,
+      "medium": 10,
+      "low": 5
+    }
+  },
+  "config": {
+    "default_email_limit": 10
+  }
+}
+```
+
+#### Get All Emails
+**GET** `/api/v1/emails`
+
+Retrieves all application emails stored in the database.
+
+- **Response:** Array of email objects or `{"message": "No emails found"}`
+
+---
+
+### 🐛 Recent Bug Fixes
+- Fixed `needs_review()` method call to use correct `need_review()` method name
+- Fixed SQLAlchemy query in `find_or_create_company()` to use `models.Company.name` instead of `models.Company`
+- Added company filtering to `find_or_create_application()` to prevent cross-company position matching
+- Updated `tracker.py` to use config-based default limit instead of hardcoded value  
 
 ---
 
