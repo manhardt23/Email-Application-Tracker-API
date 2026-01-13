@@ -3,6 +3,7 @@ from LLM_filter import Filter
 from email_client import fetch_recent_emails
 from email_tracker.DB import models
 from sqlalchemy import func
+from datetime import datetime, timezone
 
 
 class Email_Data:
@@ -190,9 +191,22 @@ class Log_DB:
         if not new_stage:
             return
         
-        if date > application.last_updated:
+        # Normalize date to timezone-naive UTC for comparison
+        if date.tzinfo is not None:
+            # Convert timezone-aware date to UTC and make it naive
+            date_naive = date.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            date_naive = date
+        
+        # Ensure application.last_updated is also naive for comparison
+        if application.last_updated.tzinfo is not None:
+            last_updated_naive = application.last_updated.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            last_updated_naive = application.last_updated
+        
+        if date_naive > last_updated_naive:
             application.stage = new_stage
-            application.last_updated = date
+            application.last_updated = date_naive
 
     def close(self):
         self.session.close()
@@ -203,6 +217,13 @@ class Log_DB:
 
 def main(limit):
     print("=== Job Application Email Pipeline ===\n")
+    
+    # Step 0: Ensure database tables exist
+    try:
+        models.create_tables()
+    except Exception as e:
+        print(f"Warning: Could not verify/create tables: {e}")
+        print("Attempting to continue...")
     
     # Step 1: Fetch and analyze emails
     processor = Email_Processor()

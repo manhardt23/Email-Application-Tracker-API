@@ -1,12 +1,7 @@
-from sqlalchemy import Boolean, Column, Integer, String, DateTime, create_engine, Text, ForeignKey, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-import os
-from dotenv import load_dotenv
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, Text, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import  relationship
 from datetime import datetime
-
-load_dotenv()
-Base = declarative_base()
+from email_tracker.DB.database import Base
 
 class Company(Base):
     __tablename__ = 'companies'
@@ -76,41 +71,3 @@ class ApplicationEmail(Base):
     def __repr__(self):
         return f"<ApplicationEmail(id={self.id}, subject='{self.subject[:30]}...', confidence='{self.confidence}')>"
 
-
-def get_engine():
-    db_url = os.getenv("DATABASE_URL")
-    return create_engine(
-        db_url,
-        echo=True,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
-    )
-
-def get_session():
-    engine = get_engine()
-    Session = sessionmaker(bind=engine)
-    return Session()
-
-
-def create_tables():
-    """Create all tables in the database"""
-    engine = get_engine()
-    Base.metadata.create_all(bind=engine)
-    print("All tables created successfully!")
-
-
-def drop_tables():
-    """Drop all tables - USE WITH CAUTION"""
-    engine = get_engine()
-    Base.metadata.drop_all(bind=engine)
-    print("All tables dropped!")
-
-
-def get_db():
-    """Generator function to get database session (for FastAPI dependency injection)"""
-    session = get_session()
-    try:
-        yield session
-    finally:
-        session.close()
