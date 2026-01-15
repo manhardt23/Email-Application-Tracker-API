@@ -23,7 +23,10 @@ class Filter:
         Subject: {subject}
         Body: {email_content[:2000]}
 
-        Respond in JSON format:
+        Return ONLY valid JSON.
+            - Use double quotes for all keys and string values.
+            - Do not include any explanation or text.
+            - Do not include markdown.
         {{
             "is_application": boolean,
             "stage": "string or null",
@@ -43,8 +46,9 @@ class Filter:
 
 
 
-        # Use regex to safely find the JSON block
+        # Use regex to safely find the JSON block 
         match = re.search(r'\{.*\}', content, re.DOTALL)
+        analysis = None
         if match:
                 analysis = json.loads(match.group(0))
         else:

@@ -1,9 +1,10 @@
-from email.mime import application
 from LLM_filter import Filter
 from email_client import fetch_recent_emails
+from email_tracker.DB.database import SessionLocal
 from email_tracker.DB import models
 from sqlalchemy import func
 from datetime import datetime, timezone
+from sqlalchemy.orm import Session
 
 
 class Email_Data:
@@ -106,7 +107,7 @@ class Email_Processor:
 
 class Log_DB:
     def __init__(self) -> None:
-       self.session = models.get_session()
+       self.session: Session = SessionLocal()
 
     def save_email(self, email_data):
 
