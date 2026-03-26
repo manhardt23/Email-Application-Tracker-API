@@ -17,6 +17,7 @@ class Email_Data:
         self.body = body
 
         #Defined later
+        self.is_application = None
         self.company = None
         self.position = None
         self.stage = None
@@ -45,7 +46,7 @@ class Email_Data:
             "subject": self.subject,
             "date": self.date,
             "body": self.body,
-            "is_application": self.is_application,
+            "is_application": getattr(self, "is_application", None),
             "company": self.company,
             "position": self.position,
             "stage": self.stage,
@@ -145,10 +146,11 @@ class Log_DB:
 
             self.update_application_stage(application,email_data.stage, email_data.date)
 
-            self.session.add(email_record)
-            self.session.commit()
+        # Always persist the email record regardless of confidence or completeness
+        self.session.add(email_record)
+        self.session.commit()
 
-            return email_record
+        return email_record
         
 
     def save_multiple_emails(self, email_data_list):
@@ -192,6 +194,10 @@ class Log_DB:
         if not new_stage:
             return
         
+        # Handle None date - return early if date is not provided
+        if date is None:
+            return
+        
         # Normalize date to timezone-naive UTC for comparison
         if date.tzinfo is not None:
             # Convert timezone-aware date to UTC and make it naive
@@ -221,7 +227,8 @@ def main(limit):
     
     # Step 0: Ensure database tables exist
     try:
-        models.create_tables()
+        from email_tracker.DB.database import engine
+        models.Base.metadata.create_all(bind=engine)
     except Exception as e:
         print(f"Warning: Could not verify/create tables: {e}")
         print("Attempting to continue...")

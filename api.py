@@ -36,20 +36,26 @@ def get_db():
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
+@app.get("/applications/stage/{stage}")
+async def read_application_applied(db: db_dependency, stage: str):
+    result = db.query(models.Application).filter(models.Application.stage == stage).all()
+    if not result:
+        raise HTTPException(status_code=404, detail=f"no applications found with stage '{stage}'")
+    return result
+
 @app.get("/applications/{application_id}")
-async def read_application(application_id: int, db: db_dependency):
+async def read_application_id(application_id: int, db: db_dependency):
     result = db.query(models.Application).filter(models.Application.id == application_id).first()
     if not result:
         raise HTTPException(status_code=404, detail="application not found")
     return result
 
 @app.get("/applications")
-async def read_application(db: db_dependency):
+async def read_application_all(db: db_dependency):
     result = db.query(models.Application).all()
     if not result:
-        raise HTTPException(status_code=404, detail="applications not found")
+        raise HTTPException(status_code=404, detail="no applications found at stage")
     return result
-
 def has_active_job():
     return any(
         status in ("pending", "running")
@@ -74,11 +80,16 @@ def run_email_checker(background_tasks: BackgroundTasks):
 def run_tracker_job(job_id: str):
     try:
         jobs[job_id] = JobStatus.running
+        print(f"Job {job_id} started")
         tracker.main(get_email_limit())
         jobs[job_id] = JobStatus.completed
-    except Exception:
+        print(f"Job {job_id} completed successfully")
+    except Exception as e:
         jobs[job_id] = JobStatus.failed
-        raise
+        print(f"Job {job_id} failed with error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Don't re-raise - background tasks shouldn't raise exceptions
 
 
 @app.get("/jobs/{job_id}")

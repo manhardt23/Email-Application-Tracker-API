@@ -7,29 +7,37 @@ class Filter:
     def analyze_email_with_llama3(sender, subject, email_content): #Returns json
         model_name = "llama3"
         #check with quick filter first to save time
-        if not quick_filter(subject, email_content):
-            return 
+        # If quick_filter returns False, it's clearly not an application email, skip LLM
+        if not quick_filter(sender, subject, email_content):
+            print("Quick filter: Not an application email, skipping LLM analysis")
+            return None 
 
         # Construct your structured prompt
         prompt = f"""
-        Analyze this email and determine:
-        1. Is this related to a job application process? (yes/no)
-        2. If yes, what stage? (applied/rejected/interview/offer/assessment/other)
-        3. Company name (if identifiable)
-        4. Position title (if mentioned)
-
+        Analyze this email to determine if it's about a job application that the recipient has ALREADY SUBMITTED.
+        
+        IMPORTANT: This email should ONLY be classified as an application if it:
+        - Confirms receipt of an application the user submitted
+        - Provides status updates on an existing application (interview, assessment, offer, rejection)
+        - Requests action on an existing application (complete assessment, schedule interview)
+        - Is a response to an application the user sent
+        
+        DO NOT classify as an application if the email:
+        - Is a job posting or job alert about new openings
+        - Promotes new job opportunities the user hasn't applied to
+        - Is a newsletter about available positions
+        - Invites the user to apply to a new position they haven't applied to yet
+        - Is marketing/promotional content about job openings
+        
         Email:
         From: {sender}
         Subject: {subject}
         Body: {email_content[:2000]}
 
-        Return ONLY valid JSON.
-            - Use double quotes for all keys and string values.
-            - Do not include any explanation or text.
-            - Do not include markdown.
+        Return ONLY valid JSON with no explanation:
         {{
-            "is_application": boolean,
-            "stage": "string or null",
+            "is_application": boolean (true ONLY if about user's existing application, false for job postings),
+            "stage": "string or null" (applied/rejected/interview/offer/assessment/other - only if is_application is true),
             "company": "string or null",
             "position": "string or null",
             "confidence": "high/medium/low"
@@ -44,13 +52,17 @@ class Filter:
 
         content = response['message']['content']
 
-
+        print(content)
 
         # Use regex to safely find the JSON block 
         match = re.search(r'\{.*\}', content, re.DOTALL)
         analysis = None
         if match:
+            try:
                 analysis = json.loads(match.group(0))
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse JSON: {e}")
+                print("Raw content:\n", content)
         else:
             print("No JSON found. Raw content:\n", content)
         #print(content)
@@ -58,10 +70,10 @@ class Filter:
         #returns a json
         if isinstance(analysis, dict):
              return analysis
+        return None
 
 
-if __name__ == "__main__":
-    # Example test
+def main():
     sample_email = """
     Dear Jacob ,                          
 
@@ -82,3 +94,7 @@ Additionally, direct replies to this message are undeliverable and will not reac
         email_content=sample_email
     )
     print(json.dumps(analysis, indent=4))
+
+
+if __name__ == '__main__':
+     main()
