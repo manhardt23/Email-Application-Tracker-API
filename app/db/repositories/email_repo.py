@@ -1,41 +1,45 @@
-from app.db.models import ApplicationEmail
+from datetime import datetime
+
+from app.db.models import Email
 from app.db.repositories.base import BaseRepository
 
 
 class EmailRepository(BaseRepository):
-    def find_by_uid(self, uid: str) -> ApplicationEmail | None:
+    def find_by_message_id(self, message_id: str) -> Email | None:
         return (
-            self.session.query(ApplicationEmail)
-            .filter(ApplicationEmail.email_id == uid)
+            self.session.query(Email)
+            .filter(Email.message_id == message_id)
             .first()
         )
 
-    def get_all(self) -> list[ApplicationEmail]:
-        return self.session.query(ApplicationEmail).all()
+    def find_by_uid(self, uid: str) -> Email | None:
+        return self.session.query(Email).filter(Email.uid == uid).first()
 
-    def get_needs_review(self) -> list[ApplicationEmail]:
-        return (
-            self.session.query(ApplicationEmail)
-            .filter(ApplicationEmail.needs_review == True)  # noqa: E712
-            .all()
-        )
+    def exists(self, message_id: str | None, uid: str) -> bool:
+        if message_id and self.find_by_message_id(message_id):
+            return True
+        return self.find_by_uid(uid) is not None
 
-    def create_from_email_data(self, email_data) -> ApplicationEmail:
-        record = ApplicationEmail(
-            email_id=email_data.uid,
-            sender=email_data.sender,
-            subject=email_data.subject,
-            received_date=email_data.date,
-            email_body=email_data.body,
-            detected_company=email_data.company,
-            detected_position=email_data.position,
-            detected_stage=email_data.stage,
-            is_application=email_data.is_application,
-            confidence=email_data.confidence,
-            needs_review=email_data.confidence == "low",
+    def create(
+        self,
+        message_id: str | None,
+        uid: str,
+        sender: str,
+        subject: str,
+        body: str,
+        received_date: datetime,
+    ) -> Email:
+        record = Email(
+            message_id=message_id,
+            uid=uid,
+            sender=sender,
+            subject=subject,
+            body=body,
+            received_date=received_date,
         )
         self.session.add(record)
+        self.session.flush()
         return record
 
-    def link_to_application(self, email_record: ApplicationEmail, application_id: int) -> None:
-        email_record.application_id = application_id
+    def get_all(self) -> list[Email]:
+        return self.session.query(Email).all()
