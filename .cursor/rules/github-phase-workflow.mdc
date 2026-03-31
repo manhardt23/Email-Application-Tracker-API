@@ -1,0 +1,19 @@
+---
+description: GitHub phase workflow with branch, commit, and PR rules
+alwaysApply: true
+---
+
+# GitHub Phase Workflow
+
+- Start each new phase on a new branch from `main`.
+- Branch naming format: `phase<number> <brief line about the phase>`.
+- Keep all work for that phase on that phase branch.
+- Make incremental commits for each feature/task completed during the phase.
+- Do not open a PR before phase completion unless explicitly asked.
+- When the phase is agreed complete, open one PR from the phase branch for review.
+- After merge, start the next phase from updated `main` on a fresh phase branch.
+
+## Example
+
+- `phase1 auth endpoints and token refresh`
+- `phase2 email parsing and status updates`
