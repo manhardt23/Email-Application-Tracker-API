@@ -46,6 +46,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
 
                     msg = email.message_from_bytes(part[1])
                     sender = msg.get("From", "")
+                    message_id = msg.get("Message-ID")
 
                     email_date = None
                     date_str = msg.get("Date")
@@ -66,6 +67,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                     body = _extract_body(msg)
 
                     results.append({
+                        "message_id": message_id,
                         "uid": uid.decode(),
                         "sender": sender,
                         "subject": subject,

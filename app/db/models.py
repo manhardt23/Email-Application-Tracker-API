@@ -1,6 +1,17 @@
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base
 
 # NOTE: Phase 2 will replace this schema with normalized tables
@@ -16,7 +27,11 @@ class Company(Base):
     domain = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    applications = relationship("Application", back_populates="company", cascade="all, delete-orphan")
+    applications = relationship(
+        "Application",
+        back_populates="company",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Company(id={self.id}, name='{self.name}')>"
@@ -30,11 +45,20 @@ class Application(Base):
     position = Column(String(500), nullable=False)
     stage = Column(String(50), default="applied", nullable=False)
     applied_date = Column(DateTime, default=datetime.utcnow, nullable=False)
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_updated = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
     notes = Column(Text)
 
     company = relationship("Company", back_populates="applications")
-    analyses = relationship("EmailAnalysis", back_populates="application", cascade="all, delete-orphan")
+    analyses = relationship(
+        "EmailAnalysis",
+        back_populates="application",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("company_id", "position", name="unique_company_position"),
