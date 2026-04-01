@@ -9,12 +9,14 @@ class EmailData:
 
     def __init__(
         self,
+        message_id: str | None,
         uid: str,
         sender: str,
         subject: str,
         date: datetime | None,
         body: str,
     ) -> None:
+        self.message_id = message_id
         self.uid = uid
         self.sender = sender
         self.subject = subject
@@ -63,6 +65,7 @@ class EmailProcessor:
         raw_emails = fetch_recent_emails(limit)
         self.email_list = [
             EmailData(
+                message_id=raw.get("message_id"),
                 uid=raw["uid"],
                 sender=raw["sender"],
                 subject=raw["subject"],
