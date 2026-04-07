@@ -91,22 +91,64 @@ def fetch_recent_emails(limit: int) -> list[dict]:
 
 
 def _extract_body(msg) -> str:
-    """Extract and clean plain text from email message."""
-    body = ""
+    """Extract clean text from email content using HTML-first parsing."""
+    html_parts: list[str] = []
+    plain_parts: list[str] = []
+
     if msg.is_multipart():
         for part in msg.walk():
-            if part.get_content_type() in ("text/plain", "text/html"):
-                payload = part.get_payload(decode=True)
-                if payload:
-                    body += payload.decode("utf-8", errors="ignore")
+            if part.get_content_disposition() == "attachment":
+                continue
+            content_type = part.get_content_type()
+            if content_type not in ("text/plain", "text/html"):
+                continue
+            decoded_payload = _decode_payload(part)
+            if not decoded_payload:
+                continue
+            if content_type == "text/html":
+                html_parts.append(decoded_payload)
+            else:
+                plain_parts.append(decoded_payload)
     else:
-        payload = msg.get_payload(decode=True)
-        if payload:
-            body = payload.decode("utf-8", errors="ignore")
+        content_type = msg.get_content_type()
+        decoded_payload = _decode_payload(msg)
+        if decoded_payload:
+            if content_type == "text/html":
+                html_parts.append(decoded_payload)
+            else:
+                plain_parts.append(decoded_payload)
 
-    # Strip HTML markup to plain text
-    body = BeautifulSoup(body, "html.parser").get_text()
+    # Prefer HTML rendering when available; fallback to plaintext.
+    if html_parts:
+        rendered = " ".join(_html_to_text(part) for part in html_parts)
+    else:
+        rendered = " ".join(plain_parts)
 
+    return _normalize_body_text(rendered)
+
+
+def _decode_payload(part: Any) -> str:
+    payload = part.get_payload(decode=True)
+    if payload is None:
+        return ""
+    charset = part.get_content_charset() or "utf-8"
+    try:
+        return payload.decode(charset, errors="ignore")
+    except (LookupError, UnicodeDecodeError):
+        return payload.decode("utf-8", errors="ignore")
+
+
+def _html_to_text(html: str) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+
+    # Use line separators so list/table structures do not collapse into one token.
+    return soup.get_text(separator="\n")
+
+
+def _normalize_body_text(body: str) -> str:
     # Clean up noise
     body = re.sub(r"http\S+", "", body)
     body = re.sub(r"www\.\S+", "", body)
