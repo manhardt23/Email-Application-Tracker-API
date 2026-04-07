@@ -47,7 +47,13 @@ def fetch_recent_emails(limit: int) -> list[dict]:
 
                     msg = email.message_from_bytes(part[1])
                     sender = _optional_str(msg.get("From"))
-                    message_id = msg.get("Message-ID")
+                    message_id = _optional_str(msg.get("Message-ID"))
+                    if not message_id:
+                        uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
+                        print(
+                            f"Skipping email {uid_str}: missing required Message-ID header"
+                        )
+                        continue
 
                     email_date = None
                     date_str = msg.get("Date")
