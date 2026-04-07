@@ -48,8 +48,11 @@ def run() -> None:
         app_repo = ApplicationRepository(session)
 
         for email_data in application_emails:
-            if email_repo.find_by_uid(email_data.uid):
-                print(f"Duplicate — skipping uid: {email_data.uid}")
+            if email_repo.find_by_message_id(email_data.message_id):
+                print(
+                    "Duplicate Message-ID — skipping email: "
+                    f"{email_data.message_id}"
+                )
                 continue
 
             email_record = email_repo.create_from_email_data(email_data)
