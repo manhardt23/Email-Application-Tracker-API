@@ -3,6 +3,7 @@ import imaplib
 import re
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -45,7 +46,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                         continue
 
                     msg = email.message_from_bytes(part[1])
-                    sender = msg.get("From", "")
+                    sender = _optional_str(msg.get("From"))
                     message_id = msg.get("Message-ID")
 
                     email_date = None
@@ -56,21 +57,21 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                         except Exception as e:
                             print(f"Warning: could not parse date for {uid.decode()}: {e}")
 
-                    raw_subject = msg.get("Subject", "")
-                    decoded, encoding = decode_header(raw_subject)[0]
-                    subject = (
-                        decoded.decode(encoding or "utf-8", errors="ignore")
-                        if isinstance(decoded, bytes)
-                        else decoded
-                    )
+                    raw_subject = msg.get("Subject")
+                    subject = _decode_subject(raw_subject)
 
                     body = _extract_body(msg)
+                    raw_headers = dict(msg.items())
 
                     results.append({
                         "message_id": message_id,
                         "uid": uid.decode(),
                         "sender": sender,
                         "subject": subject,
+                        "received_date": email_date,
+                        "body_text": _optional_str(body),
+                        "raw_headers": raw_headers or None,
+                        # Backward-compat aliases; remove after service migration.
                         "body": body,
                         "date": email_date,
                     })
@@ -113,3 +114,22 @@ def _extract_body(msg) -> str:
     body = re.sub(r"(--|__|==).*", "", body)
     body = re.sub(r"(?i)unsubscribe.*", "", body)
     return body.strip()
+
+
+def _decode_subject(raw_subject: Any) -> str | None:
+    if raw_subject is None:
+        return None
+    decoded, encoding = decode_header(raw_subject)[0]
+    subject = (
+        decoded.decode(encoding or "utf-8", errors="ignore")
+        if isinstance(decoded, bytes)
+        else str(decoded)
+    )
+    return _optional_str(subject)
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
