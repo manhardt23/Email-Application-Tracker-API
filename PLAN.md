@@ -62,7 +62,7 @@ app/
 | # | Phase | Deliverable |
 |---|-------|-------------|
 | 1 | **Foundation** ✅ | Package structure, imports fixed, Pydantic config, requirements.txt |
-| 2 | **DB Normalization** | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic |
+| 2 | **DB Normalization** ✅ | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic |
 | 3 | **Email Parser** | Structured BS4 HTML extraction, `Message-ID` dedup |
 | 4 | **LLM → Groq** | Groq adapter, Protocol abstraction, Ollama for local dev |
 | 5 | **API Cleanup** | Full `/api/v1/` endpoints, DB-backed job status |
@@ -80,3 +80,38 @@ app/
 - System crontab fires worker at: `0 7,12,17,20 * * 1-5` (7am, 12pm, 5pm, 8pm weekdays)
 - PostgreSQL credentials → AWS Secrets Manager; injected at container startup via IAM Instance Profile
 - Set EBS `DeleteOnTermination=false` before launching EC2 to protect PostgreSQL data
+
+## Phase 3 Breakdown (manageable chunks)
+
+**Phase:** 3 — Email Parser  
+**Already done:** Phase 1 Foundation, Phase 2 DB Normalization  
+**This phase delivers:** BS4 structured extraction + strict `Message-ID` gate + duplicate logging
+
+### Chunk 0 (planning + commit on main)
+- Update this plan with Phase 3 acceptance criteria and chunk checklist
+
+### Chunk 1 (parser output contract)
+- Ensure parser output always includes keys: `subject`, `sender`, `received_date`, `body_text`, `raw_headers`
+- Keys above are soft required (nullable allowed)
+
+### Chunk 2 (structured extraction)
+- Add/adjust BS4 extraction helpers for HTML email bodies
+- Include plaintext fallback behavior for non-HTML emails
+
+### Chunk 3 (hard `message_id` requirement)
+- Require `message_id` for processing
+- If missing `message_id`, skip email entirely and log skip reason
+
+### Chunk 4 (dedup + logging)
+- Deduplicate by `message_id` before storage/analysis
+- If duplicate, skip processing and log duplicate event
+
+### Chunk 5 (tests)
+- Add/update tests for:
+  - missing `message_id` => skipped
+  - duplicate `message_id` => skipped + logged
+  - soft-required keys always present (nullable)
+
+### Chunk 6 (verification)
+- Run lint/tests for touched files
+- Commit each completed chunk separately
