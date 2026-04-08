@@ -1,9 +1,7 @@
-from email.message import EmailMessage
-import importlib
 import imaplib
+import importlib
+from email.message import EmailMessage
 from types import SimpleNamespace
-
-import pytest
 
 from app.email_client import client
 from app.services.email_service import EmailData

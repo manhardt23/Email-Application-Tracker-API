@@ -3,11 +3,12 @@ Standalone worker entry point — runs the email pipeline and exits.
 
 Local:      python -m app.worker
 Docker:     docker run --rm <IMAGE> python -m app.worker
-Cron:       0 7,12,17,20 * * 1-5  docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
+Cron:       0 7,12,17,20 * * 1-5
+            docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 """
 from app.config import get_settings
-from app.db.database import SessionLocal, engine
 from app.db import models
+from app.db.database import SessionLocal, engine
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.db.repositories.email_repo import EmailRepository
