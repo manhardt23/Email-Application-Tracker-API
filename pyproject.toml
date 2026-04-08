@@ -12,5 +12,4 @@ select = ["E", "F", "I", "UP"]
 ignore = ["E712"]  # Allow `== True` in SQLAlchemy filter expressions
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
