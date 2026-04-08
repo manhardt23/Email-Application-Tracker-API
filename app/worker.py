@@ -3,11 +3,12 @@ Standalone worker entry point — runs the email pipeline and exits.
 
 Local:      python -m app.worker
 Docker:     docker run --rm <IMAGE> python -m app.worker
-Cron:       0 7,12,17,20 * * 1-5  docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
+Cron:       0 7,12,17,20 * * 1-5
+            docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 """
 from app.config import get_settings
-from app.db.database import SessionLocal, engine
 from app.db import models
+from app.db.database import SessionLocal, engine
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.db.repositories.email_repo import EmailRepository
@@ -48,8 +49,11 @@ def run() -> None:
         app_repo = ApplicationRepository(session)
 
         for email_data in application_emails:
-            if email_repo.find_by_uid(email_data.uid):
-                print(f"Duplicate — skipping uid: {email_data.uid}")
+            if email_repo.find_by_message_id(email_data.message_id):
+                print(
+                    "Duplicate Message-ID — skipping email: "
+                    f"{email_data.message_id}"
+                )
                 continue
 
             email_record = email_repo.create_from_email_data(email_data)
