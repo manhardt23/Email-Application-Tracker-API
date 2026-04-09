@@ -64,8 +64,8 @@ app/
 | 1 | **Foundation** ✅ | Package structure, imports fixed, Pydantic config, requirements.txt |
 | 2 | **DB Normalization** ✅ | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic |
 | 3 | **Email Parser** ✅ | Structured BS4 HTML extraction, `Message-ID` dedup |
-| 4 | **LLM → Groq** 🚧 | Groq adapter, Protocol abstraction, Ollama for local dev |
-| 5 | **API Cleanup** | Full `/api/v1/` endpoints, DB-backed job status |
+| 4 | **LLM → Groq** ✅ | Groq adapter, Protocol abstraction, Ollama for local dev |
+| 5 | **API Cleanup** 🚧 | Full `/api/v1/` endpoints, DB-backed job status |
 | 6 | **Worker Entrypoint** | `app/worker.py` end-to-end, `worker_runs` logging |
 | 7 | **Tests** | pytest unit + integration, 70%+ coverage |
 | 8 | **Docker** | Multi-stage Dockerfile, docker-compose for local dev |
@@ -119,3 +119,40 @@ app/
 ### Chunk 6 (verification)
 - Run lint/tests for touched files
 - Commit each completed chunk separately
+
+## Phase 5 Breakdown (manageable chunks)
+
+**Phase:** 5 — API cleanup  
+**Already done:** Phases 1–4 on `main` (including LLM Groq integration)  
+**This phase delivers:** All documented `/api/v1/` routes implemented against the DB, and job trigger/status backed by `worker_runs` instead of in-memory state.
+
+### Chunk 0 (phase bootstrap)
+- Create branch from `main`: `phase5-api-cleanup` (hyphenated; mirrors `phase4-llm-groq-integration`)
+- Keep all Phase 5 work on this branch until the phase is agreed complete
+
+### Chunk 1 (emails endpoints)
+- Add `GET /api/v1/emails` — list stored emails (reuse/extend `EmailRepository`; define sort/pagination or sensible defaults)
+- Add `GET /api/v1/emails/review` — emails whose analysis has `needs_review=True` (reuse `AnalysisRepository.get_needs_review`, load related `Email` for the response)
+- Register routes in `app/api/v1/router.py`
+
+### Chunk 2 (applications `PUT`)
+- Add `PUT /api/v1/applications/{id}` — update `stage` and/or `notes` as in the endpoint table
+- Extend `ApplicationRepository` (or a small service) for explicit user updates vs pipeline-only `update_stage` rules
+
+### Chunk 3 (DB-backed jobs API)
+- Remove in-memory `_jobs` from `app/api/v1/jobs.py`
+- `POST /api/v1/jobs/email-check`: create a `WorkerRun` via `WorkerRunRepository`, return stable `job_id` (use string form of run integer id for compatibility with existing clients)
+- `GET /api/v1/jobs/{job_id}`: load run by id; map `WorkerRun` fields to response (`status`, timestamps, counters, `error_message`)
+- Return **409** when a run with `status=running` already exists (add a small repo query helper if needed)
+
+### Chunk 4 (worker ↔ run wiring)
+- Thread optional `worker_run_id` into `app.worker.run` (and the pipeline as needed) so API-triggered runs call `WorkerRunRepository.complete` / `fail` with real counts
+- Cron/manual `python -m app.worker` runs without id: either skip run rows for that path in this phase or create an implicit run — pick one behavior and document it in code comments
+
+### Chunk 5 (polish & tests)
+- Optional: Pydantic response models for OpenAPI clarity where it helps
+- Tests for new/changed endpoints (happy path, 404, 409 for concurrent job, job status shape)
+
+### Chunk 6 (verification)
+- Run lint/tests for touched files
+- Incremental commits per completed chunk
