@@ -3,8 +3,6 @@ Groq LLM adapter — implemented in Phase 4.
 Requires: GROQ_API_KEY set in environment / .env
 Model: llama-3.1-8b-instant (free tier, 14,400 req/day, 30 req/min)
 """
-from groq import Groq
-
 from app.llm.base import EmailClassification
 from app.llm.errors import LLMProviderError, LLMResponseError
 from app.llm.normalization import extract_json_object, normalize_classification
@@ -49,6 +47,12 @@ class GroqAdapter:
         api_key: str | None,
         model: str = "llama-3.1-8b-instant",
     ) -> None:
+        try:
+            from groq import Groq
+        except ModuleNotFoundError as exc:
+            raise LLMProviderError(
+                "Groq SDK is not installed. Install dependencies from requirements.txt."
+            ) from exc
         if not api_key:
             raise ValueError("GROQ_API_KEY is required when LLM_PROVIDER='groq'.")
         self.client = Groq(api_key=api_key)
