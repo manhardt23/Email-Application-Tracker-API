@@ -23,27 +23,12 @@ DbDep = Annotated[Session, Depends(get_db)]
 
 def _run_worker(run_id: int) -> None:
     from app.worker import run  # deferred to avoid circular imports
-    db = SessionLocal()
     try:
-        repo = WorkerRunRepository(db)
-        worker_run = repo.get_by_id(run_id)
         run(worker_run_id=run_id)
-        worker_run = repo.get_by_id(run_id)
-        # worker.py handles complete/fail via WorkerRunRepository itself
     except Exception as e:
-        db2 = SessionLocal()
-        try:
-            repo2 = WorkerRunRepository(db2)
-            wr = repo2.get_by_id(run_id)
-            if wr and wr.status == "running":
-                repo2.fail(wr, str(e))
-                db2.commit()
-        finally:
-            db2.close()
+        # worker.py already calls repo.fail() internally; just log here.
         print(f"Job {run_id} failed: {e}")
         traceback.print_exc()
-    finally:
-        db.close()
 
 
 @router.post("/email-check", status_code=202)
