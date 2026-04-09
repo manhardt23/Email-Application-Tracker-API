@@ -1,6 +1,8 @@
 from datetime import datetime
+from time import perf_counter
 
 from app.email_client.client import fetch_recent_emails
+from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification, LLMClassifier
 
 
@@ -32,17 +34,36 @@ class EmailData:
 
     def classify(self, classifier: LLMClassifier) -> bool:
         """Run LLM classification. Returns True if the email is a job application."""
+        provider = getattr(classifier, "provider_name", "unknown")
+        if not quick_filter(self.sender, self.subject, self.body):
+            print("Quick filter: not an application email, skipping LLM")
+            print(f"LLM classify provider={provider} latency_ms=0 outcome=filtered")
+            self.is_application = False
+            return False
+
+        start = perf_counter()
         result: EmailClassification | None = classifier.classify_email(
             self.sender, self.subject, self.body
         )
+        latency_ms = (perf_counter() - start) * 1000
         if result is None:
+            print(
+                f"LLM classify provider={provider} "
+                f"latency_ms={latency_ms:.2f} outcome=no_classification"
+            )
             self.is_application = False
             return False
+
         self.is_application = result.is_application
         self.company = result.company
         self.position = result.position
         self.stage = result.stage
         self.confidence = result.confidence
+        print(
+            f"LLM classify provider={provider} "
+            f"latency_ms={latency_ms:.2f} outcome={bool(result.is_application)} "
+            f"confidence={result.confidence}"
+        )
         return bool(result.is_application)
 
     def __repr__(self) -> str:

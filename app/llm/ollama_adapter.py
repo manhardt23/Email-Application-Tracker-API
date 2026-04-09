@@ -1,6 +1,5 @@
 import ollama
 
-from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification
 from app.llm.errors import LLMProviderError, LLMResponseError
 from app.llm.normalization import extract_json_object, normalize_classification
@@ -46,10 +45,6 @@ class OllamaAdapter:
     def classify_email(
         self, sender: str, subject: str, body: str
     ) -> EmailClassification | None:
-        if not quick_filter(sender, subject, body):
-            print("Quick filter: not an application email, skipping LLM")
-            return None
-
         prompt = _PROMPT.format(sender=sender, subject=subject, body=body[:2000])
         try:
             response = ollama.chat(
