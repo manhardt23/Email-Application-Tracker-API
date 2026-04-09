@@ -12,17 +12,12 @@ from app.db.database import SessionLocal, engine
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.db.repositories.email_repo import EmailRepository
-from app.llm.base import LLMClassifier
+from app.llm.factory import build_classifier
 from app.services.email_service import EmailProcessor
 
 
-def _build_classifier() -> LLMClassifier:
-    settings = get_settings()
-    if settings.llm_provider == "groq":
-        from app.llm.groq_adapter import GroqAdapter
-        return GroqAdapter()
-    from app.llm.ollama_adapter import OllamaAdapter
-    return OllamaAdapter()
+def _build_classifier():
+    return build_classifier(get_settings())
 
 
 def run() -> None:

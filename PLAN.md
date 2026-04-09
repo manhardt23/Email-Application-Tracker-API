@@ -63,8 +63,8 @@ app/
 |---|-------|-------------|
 | 1 | **Foundation** ✅ | Package structure, imports fixed, Pydantic config, requirements.txt |
 | 2 | **DB Normalization** ✅ | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic |
-| 3 | **Email Parser** | Structured BS4 HTML extraction, `Message-ID` dedup |
-| 4 | **LLM → Groq** | Groq adapter, Protocol abstraction, Ollama for local dev |
+| 3 | **Email Parser** ✅ | Structured BS4 HTML extraction, `Message-ID` dedup |
+| 4 | **LLM → Groq** 🚧 | Groq adapter, Protocol abstraction, Ollama for local dev |
 | 5 | **API Cleanup** | Full `/api/v1/` endpoints, DB-backed job status |
 | 6 | **Worker Entrypoint** | `app/worker.py` end-to-end, `worker_runs` logging |
 | 7 | **Tests** | pytest unit + integration, 70%+ coverage |
@@ -81,36 +81,40 @@ app/
 - PostgreSQL credentials → AWS Secrets Manager; injected at container startup via IAM Instance Profile
 - Set EBS `DeleteOnTermination=false` before launching EC2 to protect PostgreSQL data
 
-## Phase 3 Breakdown (manageable chunks)
+## Phase 4 Breakdown (manageable chunks)
 
-**Phase:** 3 — Email Parser  
-**Already done:** Phase 1 Foundation, Phase 2 DB Normalization  
-**This phase delivers:** BS4 structured extraction + strict `Message-ID` gate + duplicate logging
+**Phase:** 4 — LLM to Groq  
+**Already done:** Phase 1 Foundation, Phase 2 DB Normalization, Phase 3 Email Parser  
+**This phase delivers:** Groq-backed classifier in prod, Ollama parity for local, provider-based routing via config
 
-### Chunk 0 (planning + commit on main)
-- Update this plan with Phase 3 acceptance criteria and chunk checklist
+### Chunk 0 (phase bootstrap)
+- Create branch from `main`: `phase4 llm groq integration`
+- Keep all Phase 4 work on this branch until phase completion
 
-### Chunk 1 (parser output contract)
-- Ensure parser output always includes keys: `subject`, `sender`, `received_date`, `body_text`, `raw_headers`
-- Keys above are soft required (nullable allowed)
+### Chunk 1 (provider contract + routing)
+- Finalize/confirm `LLMClassifier` protocol contract
+- Route classifier implementation via `LLM_PROVIDER`
+- Fail fast on invalid provider values with actionable error
 
-### Chunk 2 (structured extraction)
-- Add/adjust BS4 extraction helpers for HTML email bodies
-- Include plaintext fallback behavior for non-HTML emails
+### Chunk 2 (Groq adapter)
+- Implement Groq adapter for `llama-3.1-8b-instant`
+- Normalize request/response into shared classifier output schema
+- Handle provider/API errors with consistent app-level exceptions
 
-### Chunk 3 (hard `message_id` requirement)
-- Require `message_id` for processing
-- If missing `message_id`, skip email entirely and log skip reason
+### Chunk 3 (Ollama parity)
+- Ensure Ollama adapter uses the same normalized output contract
+- Keep local dev path straightforward with minimal env setup
 
-### Chunk 4 (dedup + logging)
-- Deduplicate by `message_id` before storage/analysis
-- If duplicate, skip processing and log duplicate event
+### Chunk 4 (pipeline integration)
+- Wire provider factory into email analysis service
+- Preserve `quick_filter` behavior to avoid unnecessary LLM calls
+- Add logs for provider, latency, and classification outcome
 
 ### Chunk 5 (tests)
 - Add/update tests for:
-  - missing `message_id` => skipped
-  - duplicate `message_id` => skipped + logged
-  - soft-required keys always present (nullable)
+  - provider routing (`groq`, `ollama`, invalid provider)
+  - adapter normalization and failure paths
+  - mocked integration flow through analysis pipeline
 
 ### Chunk 6 (verification)
 - Run lint/tests for touched files

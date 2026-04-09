@@ -1,13 +1,12 @@
-import json
-import re
-
 import ollama
 
-from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification
+from app.llm.errors import LLMProviderError, LLMResponseError
+from app.llm.normalization import extract_json_object, normalize_classification
 
 _PROMPT = """\
-Analyze this email to determine if it's about a job application that the recipient has ALREADY SUBMITTED.
+Analyze this email to determine if it's about a job application
+that the recipient has ALREADY SUBMITTED.
 
 IMPORTANT: Classify as an application ONLY if the email:
 - Confirms receipt of an application the user submitted
@@ -39,42 +38,25 @@ Return ONLY valid JSON with no explanation:
 
 
 class OllamaAdapter:
+    provider_name = "ollama"
+
     def __init__(self, model: str = "llama3") -> None:
         self.model = model
 
     def classify_email(
         self, sender: str, subject: str, body: str
     ) -> EmailClassification | None:
-        if not quick_filter(sender, subject, body):
-            print("Quick filter: not an application email, skipping LLM")
-            return None
-
         prompt = _PROMPT.format(sender=sender, subject=subject, body=body[:2000])
-        response = ollama.chat(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        content = response["message"]["content"]
-        print(content)
-
-        match = re.search(r"\{.*\}", content, re.DOTALL)
-        if not match:
-            print("No JSON found in LLM response")
-            return None
-
         try:
-            data = json.loads(match.group(0))
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse LLM JSON: {e}")
-            return None
-
-        if not isinstance(data, dict):
-            return None
-
-        return EmailClassification(
-            is_application=bool(data.get("is_application", False)),
-            company=data.get("company"),
-            position=data.get("position"),
-            stage=data.get("stage"),
-            confidence=data.get("confidence", "low"),
-        )
+            response = ollama.chat(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = response["message"]["content"]
+            return normalize_classification(extract_json_object(content))
+        except LLMResponseError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise LLMProviderError(
+                f"Ollama classification failed with model {self.model}."
+            ) from exc
