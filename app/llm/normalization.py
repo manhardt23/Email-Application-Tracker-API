@@ -26,9 +26,16 @@ def normalize_classification(data: dict[str, Any]) -> EmailClassification:
     confidence = str(data.get("confidence", "low")).lower()
     if confidence not in {"high", "medium", "low"}:
         confidence = "low"
+    raw = data.get("is_application", False)
+    if isinstance(raw, bool):
+        is_application = raw
+    elif isinstance(raw, str):
+        is_application = raw.strip().lower() == "true"
+    else:
+        is_application = False
 
     return EmailClassification(
-        is_application=bool(data.get("is_application", False)),
+        is_application=is_application,
         company=data.get("company"),
         position=data.get("position"),
         stage=stage if stage is None else str(stage),
