@@ -46,7 +46,11 @@ def test_groq_adapter_normalizes_response(monkeypatch):
         choices=[
             SimpleNamespace(
                 message=SimpleNamespace(
-                    content='{"is_application": true, "company": "Acme", "position": "SWE", "stage": "interview", "confidence": "high"}'
+                    content=(
+                        '{"is_application": true, "company": "Acme", '
+                        '"position": "SWE", "stage": "interview", '
+                        '"confidence": "high"}'
+                    )
                 )
             )
         ]
@@ -87,7 +91,11 @@ def test_ollama_adapter_normalizes_response(monkeypatch):
         "app.llm.ollama_adapter.ollama.chat",
         lambda **kwargs: {
             "message": {
-                "content": '{"is_application": false, "company": null, "position": null, "stage": null, "confidence": "medium"}'
+                "content": (
+                    '{"is_application": false, "company": null, '
+                    '"position": null, "stage": null, '
+                    '"confidence": "medium"}'
+                )
             }
         },
     )

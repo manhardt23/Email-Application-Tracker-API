@@ -5,7 +5,8 @@ from app.llm.errors import LLMProviderError, LLMResponseError
 from app.llm.normalization import extract_json_object, normalize_classification
 
 _PROMPT = """\
-Analyze this email to determine if it's about a job application that the recipient has ALREADY SUBMITTED.
+Analyze this email to determine if it's about a job application
+that the recipient has ALREADY SUBMITTED.
 
 IMPORTANT: Classify as an application ONLY if the email:
 - Confirms receipt of an application the user submitted
