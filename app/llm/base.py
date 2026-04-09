@@ -12,6 +12,8 @@ class EmailClassification:
 
 
 class LLMClassifier(Protocol):
+    provider_name: str
+
     def classify_email(
         self, sender: str, subject: str, body: str
     ) -> EmailClassification | None:
