@@ -53,7 +53,6 @@ class OllamaAdapter:
                 messages=[{"role": "user", "content": prompt}],
             )
             content = response["message"]["content"]
-            print(content)
             return normalize_classification(extract_json_object(content))
         except LLMResponseError:
             raise
