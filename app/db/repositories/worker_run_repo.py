@@ -39,3 +39,10 @@ class WorkerRunRepository(BaseRepository):
             .limit(limit)
             .all()
         )
+
+    def has_active_run(self) -> bool:
+        return (
+            self.session.query(WorkerRun)
+            .filter(WorkerRun.status == "running")
+            .first()
+        ) is not None
