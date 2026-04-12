@@ -42,4 +42,8 @@ class EmailRepository(BaseRepository):
         return record
 
     def get_all(self) -> list[Email]:
-        return self.session.query(Email).all()
+        return (
+            self.session.query(Email)
+            .order_by(Email.received_date.desc())
+            .all()
+        )
