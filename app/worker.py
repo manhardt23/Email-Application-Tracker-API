@@ -31,21 +31,25 @@ def run(worker_run_id: int | None = None) -> None:
 
     models.Base.metadata.create_all(bind=engine)
 
-    classifier = _build_classifier()
-    processor = EmailProcessor(classifier)
-    processor.fetch_emails(settings.email_limit)
-    processor.analyze_emails()
-
     session = SessionLocal()
+    worker_run = None
+    run_repo = WorkerRunRepository(session)
+    processor = None
     try:
-        run_repo = WorkerRunRepository(session)
-
-        # Reuse an existing run row (API-triggered) or create one (cron/manual).
+        # Resolve WorkerRun before fetch/analyze so pipeline failures do not orphan a new run row.
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)
+            if worker_run is None:
+                print(f"ERROR: WorkerRun id={worker_run_id} not found — aborting.")
+                return
         else:
             worker_run = run_repo.create()
             session.commit()
+
+        classifier = _build_classifier()
+        processor = EmailProcessor(classifier)
+        processor.fetch_emails(settings.email_limit)
+        processor.analyze_emails()
 
         email_repo = EmailRepository(session)
         company_repo = CompanyRepository(session)
@@ -106,11 +110,12 @@ def run(worker_run_id: int | None = None) -> None:
         session.commit()
 
     except Exception as e:
-        try:
-            run_repo.fail(worker_run, str(e))
-            session.commit()
-        except Exception:
-            pass
+        if worker_run is not None:
+            try:
+                run_repo.fail(worker_run, str(e))
+                session.commit()
+            except Exception:
+                pass
         raise
     finally:
         session.close()

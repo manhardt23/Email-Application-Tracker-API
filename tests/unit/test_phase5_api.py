@@ -4,7 +4,7 @@ Phase 5 API tests — emails endpoints, applications PUT, jobs DB-backed.
 Uses SQLite in-memory via dependency override so no real DB is needed.
 """
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
@@ -13,10 +13,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Application, Company, Email, EmailAnalysis, WorkerRun
-from app.api.v1 import applications as apps_module, emails as emails_module, jobs as jobs_module
+from app.api.v1 import applications as apps_module
+from app.api.v1 import emails as emails_module
+from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
-
+from app.db.models import Application, Base, Company, Email, EmailAnalysis, WorkerRun
 
 # ---------------------------------------------------------------------------
 # In-memory SQLite test DB + session factory
@@ -74,10 +75,17 @@ def db():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _seed_email_with_analysis(session, *, needs_review=False, is_application=True):
+def _seed_email_with_analysis(
+    session,
+    *,
+    needs_review=False,
+    is_application=True,
+    message_id="msg-1",
+    uid="uid-1",
+):
     email = Email(
-        message_id="msg-1",
-        uid="uid-1",
+        message_id=message_id,
+        uid=uid,
         sender="hr@example.com",
         subject="Your application",
         received_date=datetime(2024, 1, 1),
@@ -134,6 +142,15 @@ def test_list_emails_404_when_empty(client):
     assert resp.status_code == 404
 
 
+def test_list_emails_respects_limit(client, db):
+    for i in range(3):
+        _seed_email_with_analysis(db, message_id=f"msg-{i}", uid=f"uid-{i}")
+
+    resp = client.get("/api/v1/emails?limit=2&offset=0")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
 # ---------------------------------------------------------------------------
 # GET /emails/review
 # ---------------------------------------------------------------------------
@@ -178,6 +195,25 @@ def test_put_application_updates_notes(client, db):
     assert resp.json()["notes"] == "Great company"
 
 
+def test_put_application_explicit_null_notes_clears(client, db):
+    application = _seed_application(db)
+    db.query(Application).filter(Application.id == application.id).update({"notes": "to clear"})
+    db.commit()
+
+    resp = client.put(f"/api/v1/applications/{application.id}", json={"notes": None})
+
+    assert resp.status_code == 200
+    assert resp.json()["notes"] is None
+
+
+def test_put_application_rejects_null_stage(client, db):
+    application = _seed_application(db)
+
+    resp = client.put(f"/api/v1/applications/{application.id}", json={"stage": None})
+
+    assert resp.status_code == 422
+
+
 def test_put_application_rejects_invalid_stage(client, db):
     application = _seed_application(db)
 
@@ -206,9 +242,10 @@ def test_put_application_partial_update_no_fields(client, db):
 # ---------------------------------------------------------------------------
 
 def test_trigger_job_creates_worker_run(client):
-    with patch("app.api.v1.jobs._run_worker"):
+    with patch("app.api.v1.jobs._run_worker") as mock_run:
         resp = client.post("/api/v1/jobs/email-check")
 
+    mock_run.assert_called_once()
     assert resp.status_code == 202
     data = resp.json()
     assert "job_id" in data
@@ -245,7 +282,8 @@ def test_trigger_job_409_when_already_running(client, db):
     db.add(run)
     db.commit()
 
-    with patch("app.api.v1.jobs._run_worker"):
+    with patch("app.api.v1.jobs._run_worker") as mock_run:
         resp = client.post("/api/v1/jobs/email-check")
 
+    mock_run.assert_not_called()
     assert resp.status_code == 409

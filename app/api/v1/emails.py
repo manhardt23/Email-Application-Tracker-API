@@ -1,12 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.database import SessionLocal
 from app.db.models import Email, EmailAnalysis
-from app.db.repositories.email_repo import EmailRepository
-from app.db.repositories.analysis_repo import AnalysisRepository
 
 router = APIRouter()
 
@@ -42,11 +40,17 @@ def _flatten(email: Email) -> dict:
 
 
 @router.get("")
-def list_emails(db: DbDep):
+def list_emails(
+    db: DbDep,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
     emails = (
         db.query(Email)
         .options(joinedload(Email.analysis))
         .order_by(Email.received_date.desc())
+        .limit(limit)
+        .offset(offset)
         .all()
     )
     if not emails:
@@ -55,11 +59,17 @@ def list_emails(db: DbDep):
 
 
 @router.get("/review")
-def list_emails_for_review(db: DbDep):
+def list_emails_for_review(
+    db: DbDep,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
     analyses = (
         db.query(EmailAnalysis)
         .filter(EmailAnalysis.needs_review == True)  # noqa: E712
         .options(joinedload(EmailAnalysis.email))
+        .limit(limit)
+        .offset(offset)
         .all()
     )
     if not analyses:

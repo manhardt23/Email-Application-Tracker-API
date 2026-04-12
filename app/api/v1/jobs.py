@@ -34,9 +34,9 @@ def _run_worker(run_id: int) -> None:
 @router.post("/email-check", status_code=202)
 def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep):
     repo = WorkerRunRepository(db)
-    if repo.has_active_run():
+    run = repo.try_create_running_run()
+    if run is None:
         raise HTTPException(status_code=409, detail="An email check is already running")
-    run = repo.create()
     db.commit()
     db.refresh(run)
     run_id = run.id

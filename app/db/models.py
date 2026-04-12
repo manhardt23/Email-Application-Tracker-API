@@ -5,10 +5,12 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -94,6 +96,16 @@ class Email(Base):
 
 class WorkerRun(Base):
     __tablename__ = "worker_runs"
+
+    __table_args__ = (
+        Index(
+            "uq_worker_runs_single_running",
+            "status",
+            unique=True,
+            sqlite_where=text("status = 'running'"),
+            postgresql_where=text("status = 'running'"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
     started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

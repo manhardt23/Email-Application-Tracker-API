@@ -1,5 +1,6 @@
 import imaplib
 import importlib
+from datetime import datetime
 from email.message import EmailMessage
 from types import SimpleNamespace
 
@@ -131,7 +132,15 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
         def exists(self, message_id, uid):  # noqa: ANN001
             return True  # simulate duplicate
 
-        def create(self, **kwargs):  # noqa: ANN001
+        def create(  # noqa: ANN001
+            self,
+            message_id: str | None,
+            uid: str,
+            sender: str,
+            subject: str,
+            body: str,
+            received_date: datetime,
+        ):
             raise AssertionError("Duplicate should skip create")
 
     class _FakeCompanyRepository:
@@ -351,7 +360,15 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def exists(self, message_id, uid):  # noqa: ANN001
             return False
 
-        def create(self, message_id, **kwargs):  # noqa: ANN001
+        def create(  # noqa: ANN001
+            self,
+            message_id: str | None,
+            uid: str,
+            sender: str,
+            subject: str,
+            body: str,
+            received_date: datetime,
+        ):
             created_message_ids.append(message_id)
             return _FakeEmailRecord()
 

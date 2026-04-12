@@ -60,9 +60,11 @@ def update_application(application_id: int, body: ApplicationUpdate, db: DbDep):
     application = repo.get_by_id(application_id)
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
-    if body.stage is not None:
+    if "stage" in body.model_fields_set:
+        if body.stage is None:
+            raise HTTPException(status_code=422, detail="stage cannot be null")
         application.stage = body.stage.value
-    if body.notes is not None:
+    if "notes" in body.model_fields_set:
         application.notes = body.notes
     db.commit()
     db.refresh(application)

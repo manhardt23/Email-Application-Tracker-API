@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
+
 from app.db.models import WorkerRun
 from app.db.repositories.base import BaseRepository
 
@@ -10,6 +12,17 @@ class WorkerRunRepository(BaseRepository):
         self.session.add(run)
         self.session.flush()
         return run
+
+    def try_create_running_run(self) -> WorkerRun | None:
+        """Insert a running WorkerRun, or None if another running row exists."""
+        run = WorkerRun(status="running")
+        try:
+            with self.session.begin_nested():
+                self.session.add(run)
+                self.session.flush()
+            return run
+        except IntegrityError:
+            return None
 
     def complete(
         self,
@@ -40,9 +53,3 @@ class WorkerRunRepository(BaseRepository):
             .all()
         )
 
-    def has_active_run(self) -> bool:
-        return (
-            self.session.query(WorkerRun)
-            .filter(WorkerRun.status == "running")
-            .first()
-        ) is not None
