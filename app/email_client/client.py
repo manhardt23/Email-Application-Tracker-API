@@ -2,6 +2,8 @@ import email
 import imaplib
 import logging
 import re
+import socket
+import time
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -12,9 +14,22 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# Errors that are worth retrying once (network blip, server reset, timeout).
+# imaplib.IMAP4.abort is raised on broken connections; OSError/socket.timeout
+# cover TCP-level failures. imaplib.IMAP4.error is a permanent protocol error
+# (bad credentials, mailbox not found) — do NOT retry those.
+_TRANSIENT_IMAP_ERRORS = (imaplib.IMAP4.abort, OSError, socket.timeout, TimeoutError)
 
-def _connect_to_inbox():
+# Single retry with a short back-off — keeps cron jobs fast while surviving
+# transient server resets (Comcast IMAP is occasionally flaky).
+_CONNECT_RETRY_DELAY_SECONDS = 2
+_CONNECT_MAX_ATTEMPTS = 2
+
+
+def _connect_to_inbox(timeout: int | None = None):
     settings = get_settings()
+    imap_timeout = timeout if timeout is not None else getattr(settings, "imap_timeout_seconds", 30)
+    socket.setdefaulttimeout(imap_timeout)
     mail = imaplib.IMAP4_SSL(settings.imap_server)
     mail.login(settings.email_user, settings.email_pass)
     mail.select("inbox")
@@ -22,19 +37,53 @@ def _connect_to_inbox():
 
 
 def fetch_recent_emails(limit: int) -> list[dict]:
-    mail = None
-    try:
-        mail = _connect_to_inbox()
-        status, data = mail.uid("search", None, "ALL")
-        if status != "OK":
-            raise RuntimeError(f"IMAP search failed: {status}")
+    """Fetch up to *limit* most-recent emails from the inbox.
 
+    Retries the connect+search phase once on transient network errors. Per-message
+    fetch errors are logged and skipped without aborting the whole run (no log spam).
+    """
+    last_exc: Exception | None = None
+    mail = None
+
+    for attempt in range(1, _CONNECT_MAX_ATTEMPTS + 1):
+        try:
+            mail = _connect_to_inbox()
+            status, data = mail.uid("search", None, "ALL")
+            if status != "OK":
+                raise RuntimeError(f"IMAP search failed: {status}")
+            break
+        except _TRANSIENT_IMAP_ERRORS as exc:
+            last_exc = exc
+            _close_mail(mail)
+            mail = None
+            if attempt < _CONNECT_MAX_ATTEMPTS:
+                logger.warning(
+                    "Transient IMAP error on attempt %d/%d: %s — retrying in %ds",
+                    attempt,
+                    _CONNECT_MAX_ATTEMPTS,
+                    exc,
+                    _CONNECT_RETRY_DELAY_SECONDS,
+                )
+                time.sleep(_CONNECT_RETRY_DELAY_SECONDS)
+            else:
+                logger.error(
+                    "IMAP connection failed after %d attempts: %s", _CONNECT_MAX_ATTEMPTS, exc
+                )
+                raise
+        except imaplib.IMAP4.error as exc:
+            # Permanent error (auth failure, bad mailbox) — fail fast, no retry.
+            logger.error("Permanent IMAP error: %s", exc)
+            _close_mail(mail)
+            raise
+
+    try:
         if not data or not data[0]:
             logger.info("No emails found in inbox")
             return []
 
         mail_uids = data[0].split()
         recent_uids = mail_uids[-limit:] if len(mail_uids) > limit else mail_uids
+        logger.debug("IMAP search returned %d UIDs; processing last %d", len(mail_uids), len(recent_uids))
 
         results = []
         for uid in recent_uids:
@@ -89,12 +138,16 @@ def fetch_recent_emails(limit: int) -> list[dict]:
 
         return results
     finally:
-        if mail:
-            try:
-                mail.close()
-                mail.logout()
-            except Exception as e:
-                logger.warning("Error closing IMAP connection: %s", e)
+        _close_mail(mail)
+
+
+def _close_mail(mail) -> None:
+    if mail:
+        try:
+            mail.close()
+            mail.logout()
+        except Exception as e:
+            logger.warning("Error closing IMAP connection: %s", e)
 
 
 def _extract_body(msg) -> str:
