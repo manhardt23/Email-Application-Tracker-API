@@ -80,6 +80,8 @@ def run(worker_run_id: int | None = None) -> int:
         logger.critical("Configuration error: %s", config_error)
         return EXIT_CONFIG
 
+    logger.info("Config: %s", settings.safe_summary())
+
     from app.db import models
     from app.db.database import SessionLocal, engine
     from app.db.repositories.analysis_repo import AnalysisRepository
@@ -100,7 +102,7 @@ def run(worker_run_id: int | None = None) -> int:
     run_repo = WorkerRunRepository(session)
     processor = None
     try:
-        run_repo.reconcile_stale_worker_runs()
+        run_repo.reconcile_stale_worker_runs(max_age_minutes=settings.stale_run_ttl_minutes)
 
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)
@@ -130,9 +132,13 @@ def run(worker_run_id: int | None = None) -> int:
             logger.info("Created and claimed cron/manual WorkerRun id=%s", worker_run.id)
 
         run_id = worker_run.id
+        # max_emails_per_run is the canonical limit; email_limit kept for compat.
+        effective_limit = min(settings.max_emails_per_run, settings.email_limit)
+        logger.info("run_id=%s fetching up to %d emails", worker_run.id, effective_limit)
+
         classifier = _build_classifier(settings)
         processor = EmailProcessor(classifier)
-        processor.fetch_emails(settings.email_limit)
+        processor.fetch_emails(effective_limit)
         processor.analyze_emails()
 
         email_repo = EmailRepository(session)
