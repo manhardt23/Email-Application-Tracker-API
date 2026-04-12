@@ -115,9 +115,12 @@ class WorkerRun(Base):
     )
 
     id = Column(Integer, primary_key=True)
-    started_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    queued_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
+    started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), default="queued", nullable=False)
     emails_fetched = Column(Integer, default=0, nullable=False)

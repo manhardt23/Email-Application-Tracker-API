@@ -137,9 +137,17 @@ def test_list_emails_returns_flat_response(client, db):
     assert row["needs_review"] is False
 
 
-def test_list_emails_404_when_empty(client):
+def test_list_emails_empty_returns_200(client):
     resp = client.get("/api/v1/emails")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_list_emails_empty_page_high_offset_returns_200(client, db):
+    _seed_email_with_analysis(db)
+    resp = client.get("/api/v1/emails?limit=10&offset=100")
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 def test_list_emails_respects_limit(client, db):
@@ -166,11 +174,12 @@ def test_list_emails_review_returns_only_needs_review(client, db):
     assert data[0]["needs_review"] is True
 
 
-def test_list_emails_review_404_when_none_need_review(client, db):
+def test_list_emails_review_empty_when_none_need_review(client, db):
     _seed_email_with_analysis(db, needs_review=False)
 
     resp = client.get("/api/v1/emails/review")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 # ---------------------------------------------------------------------------

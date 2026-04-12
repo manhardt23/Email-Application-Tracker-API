@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.database import SessionLocal
@@ -48,13 +48,11 @@ def list_emails(
     emails = (
         db.query(Email)
         .options(joinedload(Email.analysis))
-        .order_by(Email.received_date.desc())
+        .order_by(Email.received_date.desc(), Email.id.desc())
         .limit(limit)
         .offset(offset)
         .all()
     )
-    if not emails:
-        raise HTTPException(status_code=404, detail="No emails found")
     return [_flatten(e) for e in emails]
 
 
@@ -73,6 +71,4 @@ def list_emails_for_review(
         .offset(offset)
         .all()
     )
-    if not analyses:
-        raise HTTPException(status_code=404, detail="No emails needing review")
     return [_flatten(a.email) for a in analyses]

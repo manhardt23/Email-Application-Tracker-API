@@ -11,6 +11,7 @@ API-triggered runs pass worker_run_id for a row created as queued; the worker cl
 in-process. Stale queued/running rows are reconciled via WorkerRunRepository.
 """
 import traceback
+from datetime import datetime, timezone
 
 from app.config import get_settings
 from app.db import models
@@ -53,13 +54,17 @@ def run(worker_run_id: int | None = None) -> None:
                     "(missing or not in queued state)."
                 )
                 return
-        else:
-            worker_run = run_repo.create()
             session.commit()
+        else:
+            worker_run = run_repo.try_create_queued_run()
+            if worker_run is None:
+                print("No WorkerRun slot available (another job is active) — exiting.")
+                return
             worker_run = run_repo.claim_if_queued(worker_run.id)
             if worker_run is None:
-                print("ERROR: Could not claim newly created WorkerRun — aborting.")
+                print("ERROR: Could not claim newly enqueued WorkerRun — aborting.")
                 return
+            session.commit()
 
         classifier = _build_classifier()
         processor = EmailProcessor(classifier)
@@ -79,13 +84,18 @@ def run(worker_run_id: int | None = None) -> None:
                 print(f"Duplicate email — skipping: {email_data.message_id or email_data.uid}")
                 continue
 
+            received = email_data.date or datetime.now(timezone.utc)
+            if email_data.date is None:
+                mid = email_data.message_id or "(no Message-ID)"
+                print(f"Warning: missing received_date for uid={email_data.uid} message_id={mid}")
+
             email_record = email_repo.create(
                 message_id=email_data.message_id,
                 uid=email_data.uid,
                 sender=email_data.sender,
                 subject=email_data.subject,
                 body=email_data.body,
-                received_date=email_data.date,
+                received_date=received,
             )
 
             # Only create an analysis row if LLM classification ran.

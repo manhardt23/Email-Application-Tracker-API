@@ -113,7 +113,7 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
         def get_by_id(self, run_id):  # noqa: ANN001
             return self._run
 
-        def create(self):  # noqa: ANN001
+        def try_create_queued_run(self):  # noqa: ANN001
             return self._run
 
         def claim_if_queued(self, run_id):  # noqa: ANN001
@@ -351,7 +351,7 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def get_by_id(self, run_id):  # noqa: ANN001
             return self._run
 
-        def create(self):  # noqa: ANN001
+        def try_create_queued_run(self):  # noqa: ANN001
             return self._run
 
         def claim_if_queued(self, run_id):  # noqa: ANN001
@@ -489,7 +489,7 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
         def reconcile_stale_worker_runs(self) -> None:
             return None
 
-        def create(self):  # noqa: ANN001
+        def try_create_queued_run(self):  # noqa: ANN001
             return self._run
 
         def claim_if_queued(self, run_id):  # noqa: ANN001
