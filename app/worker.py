@@ -1,39 +1,99 @@
 """
 Standalone worker entry point — runs the email pipeline and exits.
 
+Usage
+-----
 Local:      python -m app.worker
-Docker:     docker run --rm <IMAGE> python -m app.worker
+Docker:     docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 Cron:       0 7,12,17,20 * * 1-5
             docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 
-API-triggered runs pass worker_run_id for a row created as queued; the worker claims it
-(queued -> running) before IMAP/LLM work. Cron/manual runs insert a queued row then claim
-in-process. Stale queued/running rows are reconciled via WorkerRunRepository.
+Configuration is entirely env-based (no CLI flags). Required vars: DATABASE_URL,
+EMAIL_USER, EMAIL_PASS. Optional worker knobs: EMAIL_LIMIT, IMAP_SERVER,
+IMAP_TIMEOUT_SECONDS, MAX_EMAILS_PER_RUN, STALE_RUN_TTL_MINUTES, LLM_PROVIDER,
+GROQ_API_KEY. See app/config.py for defaults.
+
+API-triggered runs pass worker_run_id for a row already created as 'queued'; the worker
+claims it (queued → running) before IMAP/LLM work begins. Cron/manual runs insert a
+queued row then claim it in-process. Stale queued/running rows are reconciled at startup
+via WorkerRunRepository.
+
+Exit codes
+----------
+EXIT_OK          (0)  — pipeline completed (even if 0 emails processed)
+EXIT_NO_SLOT     (2)  — another run is active; this invocation is a no-op (cron-safe)
+EXIT_CONFIG      (3)  — fatal configuration error before any IMAP/DB work
+EXIT_PIPELINE    (1)  — unexpected pipeline failure; WorkerRun row marked 'failed'
 """
+import logging
+import sys
 import traceback
 from datetime import datetime, timezone
 
 from app.config import get_settings
-from app.db import models
-from app.db.database import SessionLocal, engine
-from app.db.repositories.analysis_repo import AnalysisRepository
-from app.db.repositories.application_repo import ApplicationRepository
-from app.db.repositories.company_repo import CompanyRepository
-from app.db.repositories.email_repo import EmailRepository
-from app.db.repositories.worker_run_repo import WorkerRunRepository
-from app.llm.factory import build_classifier
-from app.services.email_service import EmailProcessor
+
+# ---------------------------------------------------------------------------
+# Exit codes — documented in module docstring above.
+# ---------------------------------------------------------------------------
+EXIT_OK = 0
+EXIT_PIPELINE = 1
+EXIT_NO_SLOT = 2
+EXIT_CONFIG = 3
+
+logger = logging.getLogger(__name__)
 
 
-def _build_classifier():
-    return build_classifier(get_settings())
+def _validate_config(settings) -> str | None:
+    """Return an error message if config is fatally invalid, else None."""
+    valid_providers = ("groq", "ollama")
+    provider = (settings.llm_provider or "").strip().lower()
+    if provider not in valid_providers:
+        return (
+            f"Invalid LLM_PROVIDER={settings.llm_provider!r}. "
+            f"Expected one of: {valid_providers}. Set the env var and retry."
+        )
+    if provider == "groq" and not settings.groq_api_key:
+        return (
+            "LLM_PROVIDER=groq but GROQ_API_KEY is not set. "
+            "Provide the key or switch to LLM_PROVIDER=ollama."
+        )
+    return None
 
 
-def run(worker_run_id: int | None = None) -> None:
-    print("=== Job Application Email Pipeline ===")
-    settings = get_settings()
+def _build_classifier(settings):
+    from app.llm.factory import build_classifier
+    return build_classifier(settings)
 
-    models.Base.metadata.create_all(bind=engine)
+
+def run(worker_run_id: int | None = None) -> int:
+    """Run the email pipeline. Returns an EXIT_* code."""
+    logger.info("Worker starting — Job Application Email Pipeline")
+
+    try:
+        settings = get_settings()
+    except Exception as exc:
+        logger.critical("Failed to load settings: %s", exc)
+        return EXIT_CONFIG
+
+    config_error = _validate_config(settings)
+    if config_error:
+        logger.critical("Configuration error: %s", config_error)
+        return EXIT_CONFIG
+
+    from app.db import models
+    from app.db.database import SessionLocal, engine
+    from app.db.repositories.analysis_repo import AnalysisRepository
+    from app.db.repositories.application_repo import ApplicationRepository
+    from app.db.repositories.company_repo import CompanyRepository
+    from app.db.repositories.email_repo import EmailRepository
+    from app.db.repositories.worker_run_repo import WorkerRunRepository
+    from app.services.email_service import EmailProcessor
+
+    try:
+        models.Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.critical("Cannot connect to database: %s", exc)
+        return EXIT_CONFIG
 
     session = SessionLocal()
     worker_run = None
@@ -45,28 +105,32 @@ def run(worker_run_id: int | None = None) -> None:
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)
             if worker_run is None:
-                print(f"ERROR: WorkerRun id={worker_run_id} not found — aborting.")
-                return
+                logger.error("WorkerRun id=%s not found — aborting.", worker_run_id)
+                return EXIT_PIPELINE
             worker_run = run_repo.claim_if_queued(worker_run.id)
             if worker_run is None:
-                print(
-                    f"ERROR: WorkerRun id={worker_run_id} could not be claimed "
-                    "(missing or not in queued state)."
+                logger.error(
+                    "WorkerRun id=%s could not be claimed (not in queued state).", worker_run_id
                 )
-                return
+                return EXIT_NO_SLOT
             session.commit()
+            logger.info("Claimed API-triggered WorkerRun id=%s", worker_run.id)
         else:
             worker_run = run_repo.try_create_queued_run()
             if worker_run is None:
-                print("No WorkerRun slot available (another job is active) — exiting.")
-                return
+                logger.info(
+                    "No WorkerRun slot available (another job is active) — exiting gracefully."
+                )
+                return EXIT_NO_SLOT
             worker_run = run_repo.claim_if_queued(worker_run.id)
             if worker_run is None:
-                print("ERROR: Could not claim newly enqueued WorkerRun — aborting.")
-                return
+                logger.error("Could not claim newly enqueued WorkerRun — aborting.")
+                return EXIT_PIPELINE
             session.commit()
+            logger.info("Created and claimed cron/manual WorkerRun id=%s", worker_run.id)
 
-        classifier = _build_classifier()
+        run_id = worker_run.id
+        classifier = _build_classifier(settings)
         processor = EmailProcessor(classifier)
         processor.fetch_emails(settings.email_limit)
         processor.analyze_emails()
@@ -81,13 +145,22 @@ def run(worker_run_id: int | None = None) -> None:
 
         for email_data in processor.email_list:
             if email_repo.exists(email_data.message_id, email_data.uid):
-                print(f"Duplicate email — skipping: {email_data.message_id or email_data.uid}")
+                logger.debug(
+                    "run_id=%s duplicate email — skipping: %s",
+                    run_id,
+                    email_data.message_id or email_data.uid,
+                )
                 continue
 
             received = email_data.date or datetime.now(timezone.utc)
             if email_data.date is None:
                 mid = email_data.message_id or "(no Message-ID)"
-                print(f"Warning: missing received_date for uid={email_data.uid} message_id={mid}")
+                logger.warning(
+                    "run_id=%s missing received_date for uid=%s message_id=%s",
+                    run_id,
+                    email_data.uid,
+                    mid,
+                )
 
             email_record = email_repo.create(
                 message_id=email_data.message_id,
@@ -134,29 +207,39 @@ def run(worker_run_id: int | None = None) -> None:
         run_repo.complete(worker_run, emails_fetched, applications_found, saved)
         session.commit()
 
-    except Exception as e:
+    except Exception as exc:
         if worker_run is not None:
             wid = worker_run.id
             try:
                 session.rollback()
                 wr = run_repo.get_by_id(wid)
                 if wr is not None:
-                    run_repo.fail(wr, str(e))
+                    run_repo.fail(wr, str(exc))
                     session.commit()
             except Exception as secondary:
-                print(f"Failed to persist WorkerRun failure state: {secondary}")
+                logger.error("Failed to persist WorkerRun failure state: %s", secondary)
                 traceback.print_exc()
-        raise
+        logger.exception("Pipeline failed: %s", exc)
+        return EXIT_PIPELINE
     finally:
         session.close()
 
-    print("\n=== Summary ===")
-    print(f"Fetched:       {emails_fetched}")
-    print(f"Applications:  {applications_found}")
-    print(f"Saved:         {saved}")
-    print(f"High conf:     {len(processor.get_high_confidence())}")
-    print(f"Needs review:  {len(processor.get_needs_review())}")
+    logger.info(
+        "run_id=%s completed — fetched=%s applications=%s saved=%s high_conf=%s needs_review=%s",
+        worker_run.id,
+        emails_fetched,
+        applications_found,
+        saved,
+        len(processor.get_high_confidence()),
+        len(processor.get_needs_review()),
+    )
+    return EXIT_OK
+
+
+def main() -> None:
+    """Entry point for `python -m app.worker`. Exits with appropriate code."""
+    sys.exit(run())
 
 
 if __name__ == "__main__":
-    run()
+    main()
