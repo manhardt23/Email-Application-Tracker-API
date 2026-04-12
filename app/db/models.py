@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    literal_column,
     text,
 )
 from sqlalchemy.orm import relationship
@@ -27,7 +28,9 @@ class Company(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), unique=True, nullable=False, index=True)
     domain = Column(String(255))
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     applications = relationship(
         "Application",
@@ -46,9 +49,11 @@ class Application(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
     position = Column(String(500), nullable=False)
     stage = Column(String(50), default="applied", nullable=False)
-    applied_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    applied_date = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     last_updated = Column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
@@ -78,9 +83,11 @@ class Email(Base):
     uid = Column(String(255), nullable=False, index=True)
     sender = Column(String(255), nullable=False)
     subject = Column(String(1000))
-    received_date = Column(DateTime, nullable=False, index=True)
+    received_date = Column(DateTime(timezone=True), nullable=False, index=True)
     body = Column(Text)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     analysis = relationship(
         "EmailAnalysis",
@@ -99,18 +106,20 @@ class WorkerRun(Base):
 
     __table_args__ = (
         Index(
-            "uq_worker_runs_single_running",
-            "status",
+            "uq_worker_runs_single_active",
+            literal_column("1"),
             unique=True,
-            sqlite_where=text("status = 'running'"),
-            postgresql_where=text("status = 'running'"),
+            sqlite_where=text("status IN ('queued', 'running')"),
+            postgresql_where=text("status IN ('queued', 'running')"),
         ),
     )
 
     id = Column(Integer, primary_key=True)
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    finished_at = Column(DateTime, nullable=True)
-    status = Column(String(20), default="running", nullable=False)
+    started_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), default="queued", nullable=False)
     emails_fetched = Column(Integer, default=0, nullable=False)
     applications_found = Column(Integer, default=0, nullable=False)
     emails_saved = Column(Integer, default=0, nullable=False)
@@ -136,7 +145,9 @@ class EmailAnalysis(Base):
     confidence = Column(String(20))
     needs_review = Column(Boolean, default=False, nullable=False, index=True)
     model_used = Column(String(100))
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     email = relationship("Email", back_populates="analysis")
     application = relationship("Application", back_populates="analyses")

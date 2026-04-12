@@ -99,18 +99,28 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
     worker_module = importlib.reload(worker_module)
 
     class _FakeWorkerRun:
-        id = 1
-        status = "running"
+        def __init__(self) -> None:
+            self.id = 1
+            self.status = "queued"
 
     class _FakeWorkerRunRepository:
         def __init__(self, session):  # noqa: ANN001
-            pass
+            self._run = _FakeWorkerRun()
+
+        def reconcile_stale_worker_runs(self) -> None:
+            return None
 
         def get_by_id(self, run_id):  # noqa: ANN001
-            return _FakeWorkerRun()
+            return self._run
 
         def create(self):  # noqa: ANN001
-            return _FakeWorkerRun()
+            return self._run
+
+        def claim_if_queued(self, run_id):  # noqa: ANN001
+            if self._run.status == "queued":
+                self._run.status = "running"
+                return self._run
+            return None
 
         def complete(self, run, emails_fetched, applications_found, emails_saved):  # noqa: ANN001
             pass
@@ -120,6 +130,9 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
 
     class _FakeSession:
         def commit(self) -> None:
+            return None
+
+        def rollback(self) -> None:
             return None
 
         def close(self) -> None:
@@ -324,18 +337,28 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     created_message_ids: list[str] = []
 
     class _FakeWorkerRun:
-        id = 1
-        status = "running"
+        def __init__(self) -> None:
+            self.id = 1
+            self.status = "queued"
 
     class _FakeWorkerRunRepository:
         def __init__(self, session):  # noqa: ANN001
-            pass
+            self._run = _FakeWorkerRun()
+
+        def reconcile_stale_worker_runs(self) -> None:
+            return None
 
         def get_by_id(self, run_id):  # noqa: ANN001
-            return _FakeWorkerRun()
+            return self._run
 
         def create(self):  # noqa: ANN001
-            return _FakeWorkerRun()
+            return self._run
+
+        def claim_if_queued(self, run_id):  # noqa: ANN001
+            if self._run.status == "queued":
+                self._run.status = "running"
+                return self._run
+            return None
 
         def complete(self, run, emails_fetched, applications_found, emails_saved):  # noqa: ANN001
             pass
@@ -348,6 +371,9 @@ def test_worker_processes_new_email_successfully(monkeypatch):
 
     class _FakeSession:
         def commit(self) -> None:
+            return None
+
+        def rollback(self) -> None:
             return None
 
         def close(self) -> None:
@@ -452,15 +478,25 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
     worker_module = importlib.reload(worker_module)
 
     class _FakeWorkerRun:
-        id = 1
-        status = "running"
+        def __init__(self) -> None:
+            self.id = 1
+            self.status = "queued"
 
     class _FakeWorkerRunRepository:
         def __init__(self, session):  # noqa: ANN001
-            pass
+            self._run = _FakeWorkerRun()
+
+        def reconcile_stale_worker_runs(self) -> None:
+            return None
 
         def create(self):  # noqa: ANN001
-            return _FakeWorkerRun()
+            return self._run
+
+        def claim_if_queued(self, run_id):  # noqa: ANN001
+            if self._run.status == "queued":
+                self._run.status = "running"
+                return self._run
+            return None
 
         def complete(self, run, emails_fetched, applications_found, emails_saved):  # noqa: ANN001
             pass
@@ -470,6 +506,9 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
 
     class _FakeSession:
         def commit(self) -> None:
+            return None
+
+        def rollback(self) -> None:
             return None
 
         def close(self) -> None:

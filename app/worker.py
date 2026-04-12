@@ -6,9 +6,12 @@ Docker:     docker run --rm <IMAGE> python -m app.worker
 Cron:       0 7,12,17,20 * * 1-5
             docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 
-Every invocation (cron, manual, or API-triggered) creates or updates a WorkerRun row.
-API-triggered runs pass worker_run_id so the pre-created row is reused.
+API-triggered runs pass worker_run_id for a row created as queued; the worker claims it
+(queued -> running) before IMAP/LLM work. Cron/manual runs insert a queued row then claim
+in-process. Stale queued/running rows are reconciled via WorkerRunRepository.
 """
+import traceback
+
 from app.config import get_settings
 from app.db import models
 from app.db.database import SessionLocal, engine
@@ -36,15 +39,27 @@ def run(worker_run_id: int | None = None) -> None:
     run_repo = WorkerRunRepository(session)
     processor = None
     try:
-        # Resolve WorkerRun before fetch/analyze so pipeline failures do not orphan a new run row.
+        run_repo.reconcile_stale_worker_runs()
+
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)
             if worker_run is None:
                 print(f"ERROR: WorkerRun id={worker_run_id} not found — aborting.")
                 return
+            worker_run = run_repo.claim_if_queued(worker_run.id)
+            if worker_run is None:
+                print(
+                    f"ERROR: WorkerRun id={worker_run_id} could not be claimed "
+                    "(missing or not in queued state)."
+                )
+                return
         else:
             worker_run = run_repo.create()
             session.commit()
+            worker_run = run_repo.claim_if_queued(worker_run.id)
+            if worker_run is None:
+                print("ERROR: Could not claim newly created WorkerRun — aborting.")
+                return
 
         classifier = _build_classifier()
         processor = EmailProcessor(classifier)
@@ -111,11 +126,16 @@ def run(worker_run_id: int | None = None) -> None:
 
     except Exception as e:
         if worker_run is not None:
+            wid = worker_run.id
             try:
-                run_repo.fail(worker_run, str(e))
-                session.commit()
-            except Exception:
-                pass
+                session.rollback()
+                wr = run_repo.get_by_id(wid)
+                if wr is not None:
+                    run_repo.fail(wr, str(e))
+                    session.commit()
+            except Exception as secondary:
+                print(f"Failed to persist WorkerRun failure state: {secondary}")
+                traceback.print_exc()
         raise
     finally:
         session.close()

@@ -68,6 +68,7 @@ def list_emails_for_review(
         db.query(EmailAnalysis)
         .filter(EmailAnalysis.needs_review == True)  # noqa: E712
         .options(joinedload(EmailAnalysis.email))
+        .order_by(EmailAnalysis.id.asc())
         .limit(limit)
         .offset(offset)
         .all()

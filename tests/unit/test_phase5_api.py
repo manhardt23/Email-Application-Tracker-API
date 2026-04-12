@@ -245,11 +245,11 @@ def test_trigger_job_creates_worker_run(client):
     with patch("app.api.v1.jobs._run_worker") as mock_run:
         resp = client.post("/api/v1/jobs/email-check")
 
-    mock_run.assert_called_once()
     assert resp.status_code == 202
     data = resp.json()
+    mock_run.assert_called_once_with(int(data["job_id"]))
     assert "job_id" in data
-    assert data["status"] == "running"
+    assert data["status"] == "queued"
 
 
 def test_get_job_status_returns_run_fields(client, db):
@@ -275,6 +275,18 @@ def test_get_job_status_404_for_missing(client):
 def test_get_job_status_404_for_non_integer_id(client):
     resp = client.get("/api/v1/jobs/not-a-number")
     assert resp.status_code == 404
+
+
+def test_trigger_job_409_when_already_queued(client, db):
+    run = WorkerRun(status="queued")
+    db.add(run)
+    db.commit()
+
+    with patch("app.api.v1.jobs._run_worker") as mock_run:
+        resp = client.post("/api/v1/jobs/email-check")
+
+    mock_run.assert_not_called()
+    assert resp.status_code == 409
 
 
 def test_trigger_job_409_when_already_running(client, db):
