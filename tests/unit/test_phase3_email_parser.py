@@ -1,5 +1,6 @@
 import imaplib
 import importlib
+from datetime import datetime
 from email.message import EmailMessage
 from types import SimpleNamespace
 
@@ -97,8 +98,41 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
     worker_module = importlib.import_module("app.worker")
     worker_module = importlib.reload(worker_module)
 
+    class _FakeWorkerRun:
+        def __init__(self) -> None:
+            self.id = 1
+            self.status = "queued"
+
+    class _FakeWorkerRunRepository:
+        def __init__(self, session):  # noqa: ANN001
+            self._run = _FakeWorkerRun()
+
+        def reconcile_stale_worker_runs(self) -> None:
+            return None
+
+        def get_by_id(self, run_id):  # noqa: ANN001
+            return self._run
+
+        def try_create_queued_run(self):  # noqa: ANN001
+            return self._run
+
+        def claim_if_queued(self, run_id):  # noqa: ANN001
+            if self._run.status == "queued":
+                self._run.status = "running"
+                return self._run
+            return None
+
+        def complete(self, run, emails_fetched, applications_found, emails_saved):  # noqa: ANN001
+            pass
+
+        def fail(self, run, error_message):  # noqa: ANN001
+            pass
+
     class _FakeSession:
         def commit(self) -> None:
+            return None
+
+        def rollback(self) -> None:
             return None
 
         def close(self) -> None:
@@ -108,11 +142,19 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
         def __init__(self, session):  # noqa: ANN001
             self.session = session
 
-        def find_by_message_id(self, message_id):  # noqa: ANN001
-            return object()
+        def exists(self, message_id, uid):  # noqa: ANN001
+            return True  # simulate duplicate
 
-        def create_from_email_data(self, email_data):  # noqa: ANN001
-            raise AssertionError("Duplicate should skip create_from_email_data")
+        def create(  # noqa: ANN001
+            self,
+            message_id: str | None,
+            uid: str,
+            sender: str,
+            subject: str,
+            body: str,
+            received_date: datetime,
+        ):
+            raise AssertionError("Duplicate should skip create")
 
     class _FakeCompanyRepository:
         def __init__(self, session):  # noqa: ANN001
@@ -122,11 +164,14 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
         def __init__(self, session):  # noqa: ANN001
             self.session = session
 
+    class _FakeAnalysisRepository:
+        def __init__(self, session):  # noqa: ANN001
+            self.session = session
+
     class _FakeProcessor:
         def __init__(self, classifier):  # noqa: ANN001
             self.classifier = classifier
-            self.email_list = []
-            self.application_emails = [
+            self.email_list = [
                 EmailData(
                     message_id="<dup@example.test>",
                     uid="uid-123",
@@ -136,9 +181,9 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
                     body="text",
                 )
             ]
+            self.application_emails = self.email_list
 
         def fetch_emails(self, limit):  # noqa: ANN001
-            self.email_list = self.application_emails
             return self.email_list
 
         def analyze_emails(self):
@@ -155,14 +200,16 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
     monkeypatch.setattr(worker_module, "_build_classifier", lambda: object())
     monkeypatch.setattr(worker_module, "EmailProcessor", _FakeProcessor)
     monkeypatch.setattr(worker_module, "SessionLocal", lambda: _FakeSession())
+    monkeypatch.setattr(worker_module, "WorkerRunRepository", _FakeWorkerRunRepository)
     monkeypatch.setattr(worker_module, "EmailRepository", _FakeEmailRepository)
     monkeypatch.setattr(worker_module, "CompanyRepository", _FakeCompanyRepository)
     monkeypatch.setattr(worker_module, "ApplicationRepository", _FakeApplicationRepository)
+    monkeypatch.setattr(worker_module, "AnalysisRepository", _FakeAnalysisRepository)
 
     worker_module.run()
 
     output = capsys.readouterr().out
-    assert "Duplicate Message-ID — skipping email: <dup@example.test>" in output
+    assert "Duplicate email — skipping: <dup@example.test>" in output
 
 
 def test_fetch_recent_emails_happy_path_full_parse(monkeypatch):
@@ -287,10 +334,46 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     worker_module = importlib.import_module("app.worker")
     worker_module = importlib.reload(worker_module)
 
-    created_records: list[EmailData] = []
+    created_message_ids: list[str] = []
+
+    class _FakeWorkerRun:
+        def __init__(self) -> None:
+            self.id = 1
+            self.status = "queued"
+
+    class _FakeWorkerRunRepository:
+        def __init__(self, session):  # noqa: ANN001
+            self._run = _FakeWorkerRun()
+
+        def reconcile_stale_worker_runs(self) -> None:
+            return None
+
+        def get_by_id(self, run_id):  # noqa: ANN001
+            return self._run
+
+        def try_create_queued_run(self):  # noqa: ANN001
+            return self._run
+
+        def claim_if_queued(self, run_id):  # noqa: ANN001
+            if self._run.status == "queued":
+                self._run.status = "running"
+                return self._run
+            return None
+
+        def complete(self, run, emails_fetched, applications_found, emails_saved):  # noqa: ANN001
+            pass
+
+        def fail(self, run, error_message):  # noqa: ANN001
+            pass
+
+    class _FakeEmailRecord:
+        id = 99
 
     class _FakeSession:
         def commit(self) -> None:
+            return None
+
+        def rollback(self) -> None:
             return None
 
         def close(self) -> None:
@@ -300,12 +383,30 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def __init__(self, session):  # noqa: ANN001
             self.session = session
 
-        def find_by_message_id(self, message_id):  # noqa: ANN001
-            return None
+        def exists(self, message_id, uid):  # noqa: ANN001
+            return False
 
-        def create_from_email_data(self, email_data):  # noqa: ANN001
-            created_records.append(email_data)
+        def create(  # noqa: ANN001
+            self,
+            message_id: str | None,
+            uid: str,
+            sender: str,
+            subject: str,
+            body: str,
+            received_date: datetime,
+        ):
+            created_message_ids.append(message_id)
+            return _FakeEmailRecord()
+
+    class _FakeAnalysisRepository:
+        def __init__(self, session):  # noqa: ANN001
+            self.session = session
+
+        def create(self, **kwargs):  # noqa: ANN001
             return object()
+
+        def link_to_application(self, analysis, application_id):  # noqa: ANN001
+            pass
 
     class _FakeCompanyRepository:
         def __init__(self, session):  # noqa: ANN001
@@ -318,17 +419,19 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     class _FakeProcessor:
         def __init__(self, classifier):  # noqa: ANN001
             self.classifier = classifier
-            self.application_emails = [
-                EmailData(
-                    message_id="<new@example.test>",
-                    uid="uid-200",
-                    sender="sender@example.test",
-                    subject="subject",
-                    date=None,
-                    body="text",
-                )
-            ]
-            self.email_list = self.application_emails
+            email = EmailData(
+                message_id="<new@example.test>",
+                uid="uid-200",
+                sender="sender@example.test",
+                subject="subject",
+                date=None,
+                body="text",
+            )
+            # Mark as classified so analysis branch runs
+            email.is_application = True
+            email.confidence = "low"
+            self.email_list = [email]
+            self.application_emails = self.email_list
 
         def fetch_emails(self, limit):  # noqa: ANN001
             return self.email_list
@@ -347,14 +450,16 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     monkeypatch.setattr(worker_module, "_build_classifier", lambda: object())
     monkeypatch.setattr(worker_module, "EmailProcessor", _FakeProcessor)
     monkeypatch.setattr(worker_module, "SessionLocal", lambda: _FakeSession())
+    monkeypatch.setattr(worker_module, "WorkerRunRepository", _FakeWorkerRunRepository)
     monkeypatch.setattr(worker_module, "EmailRepository", _FakeEmailRepository)
+    monkeypatch.setattr(worker_module, "AnalysisRepository", _FakeAnalysisRepository)
     monkeypatch.setattr(worker_module, "CompanyRepository", _FakeCompanyRepository)
     monkeypatch.setattr(worker_module, "ApplicationRepository", _FakeApplicationRepository)
 
     worker_module.run()
 
-    assert len(created_records) == 1
-    assert created_records[0].message_id == "<new@example.test>"
+    assert len(created_message_ids) == 1
+    assert created_message_ids[0] == "<new@example.test>"
 
 
 def test_worker_handles_zero_application_emails(monkeypatch, capsys):
@@ -371,6 +476,43 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
     )
     worker_module = importlib.import_module("app.worker")
     worker_module = importlib.reload(worker_module)
+
+    class _FakeWorkerRun:
+        def __init__(self) -> None:
+            self.id = 1
+            self.status = "queued"
+
+    class _FakeWorkerRunRepository:
+        def __init__(self, session):  # noqa: ANN001
+            self._run = _FakeWorkerRun()
+
+        def reconcile_stale_worker_runs(self) -> None:
+            return None
+
+        def try_create_queued_run(self):  # noqa: ANN001
+            return self._run
+
+        def claim_if_queued(self, run_id):  # noqa: ANN001
+            if self._run.status == "queued":
+                self._run.status = "running"
+                return self._run
+            return None
+
+        def complete(self, run, emails_fetched, applications_found, emails_saved):  # noqa: ANN001
+            pass
+
+        def fail(self, run, error_message):  # noqa: ANN001
+            pass
+
+    class _FakeSession:
+        def commit(self) -> None:
+            return None
+
+        def rollback(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
 
     class _FakeProcessor:
         def __init__(self, classifier):  # noqa: ANN001
@@ -390,16 +532,15 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
         def get_needs_review(self):
             return []
 
-    def _session_should_not_be_used():
-        raise AssertionError("SessionLocal should not be called for zero application emails")
-
     monkeypatch.setattr(worker_module, "get_settings", lambda: SimpleNamespace(email_limit=1))
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
     monkeypatch.setattr(worker_module, "_build_classifier", lambda: object())
     monkeypatch.setattr(worker_module, "EmailProcessor", _FakeProcessor)
-    monkeypatch.setattr(worker_module, "SessionLocal", _session_should_not_be_used)
+    monkeypatch.setattr(worker_module, "SessionLocal", lambda: _FakeSession())
+    monkeypatch.setattr(worker_module, "WorkerRunRepository", _FakeWorkerRunRepository)
 
     worker_module.run()
 
     output = capsys.readouterr().out
-    assert "No application emails found in this run" in output
+    # Zero emails fetched — summary still printed
+    assert "Fetched:       0" in output
