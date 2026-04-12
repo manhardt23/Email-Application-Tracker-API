@@ -10,6 +10,6 @@ WHERE queued_at IS NULL;
 ALTER TABLE worker_runs ALTER COLUMN queued_at SET DEFAULT now();
 ALTER TABLE worker_runs ALTER COLUMN queued_at SET NOT NULL;
 
-UPDATE worker_runs SET started_at = NULL WHERE status = 'queued';
-
 ALTER TABLE worker_runs ALTER COLUMN started_at DROP NOT NULL;
+
+UPDATE worker_runs SET started_at = NULL WHERE status = 'queued';
