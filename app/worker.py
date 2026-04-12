@@ -31,6 +31,16 @@ import traceback
 from datetime import datetime, timezone
 
 from app.config import get_settings
+from app.db import models
+from app.db.database import SessionLocal, engine
+from app.db.repositories.analysis_repo import AnalysisRepository
+from app.db.repositories.application_repo import ApplicationRepository
+from app.db.repositories.company_repo import CompanyRepository
+from app.db.repositories.email_repo import EmailRepository
+from app.db.repositories.worker_run_repo import WorkerRunRepository
+from app.llm.base import EmailClassification
+from app.llm.factory import build_classifier
+from app.services.email_service import EmailProcessor
 
 # ---------------------------------------------------------------------------
 # Exit codes — documented in module docstring above.
@@ -60,11 +70,6 @@ def _validate_config(settings) -> str | None:
     return None
 
 
-def _build_classifier(settings):
-    from app.llm.factory import build_classifier
-    return build_classifier(settings)
-
-
 def run(worker_run_id: int | None = None) -> int:
     """Run the email pipeline. Returns an EXIT_* code."""
     logger.info("Worker starting — Job Application Email Pipeline")
@@ -81,15 +86,6 @@ def run(worker_run_id: int | None = None) -> int:
         return EXIT_CONFIG
 
     logger.info("Config: %s", settings.safe_summary())
-
-    from app.db import models
-    from app.db.database import SessionLocal, engine
-    from app.db.repositories.analysis_repo import AnalysisRepository
-    from app.db.repositories.application_repo import ApplicationRepository
-    from app.db.repositories.company_repo import CompanyRepository
-    from app.db.repositories.email_repo import EmailRepository
-    from app.db.repositories.worker_run_repo import WorkerRunRepository
-    from app.services.email_service import EmailProcessor
 
     try:
         models.Base.metadata.create_all(bind=engine)
@@ -136,7 +132,7 @@ def run(worker_run_id: int | None = None) -> int:
         effective_limit = min(settings.max_emails_per_run, settings.email_limit)
         logger.info("run_id=%s fetching up to %d emails", worker_run.id, effective_limit)
 
-        classifier = _build_classifier(settings)
+        classifier = build_classifier(settings)
         processor = EmailProcessor(classifier)
         processor.fetch_emails(effective_limit)
         processor.analyze_emails()
@@ -179,7 +175,6 @@ def run(worker_run_id: int | None = None) -> int:
 
             # Only create an analysis row if LLM classification ran.
             if email_data.is_application is not None:
-                from app.llm.base import EmailClassification
                 classification = EmailClassification(
                     is_application=bool(email_data.is_application),
                     company=email_data.company,
