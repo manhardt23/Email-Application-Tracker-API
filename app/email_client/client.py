@@ -1,5 +1,6 @@
 import email
 import imaplib
+import logging
 import re
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
@@ -8,6 +9,8 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _connect_to_inbox():
@@ -27,7 +30,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
             raise RuntimeError(f"IMAP search failed: {status}")
 
         if not data or not data[0]:
-            print("No emails found in inbox")
+            logger.info("No emails found in inbox")
             return []
 
         mail_uids = data[0].split()
@@ -38,7 +41,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
             try:
                 status, msg_data = mail.uid("fetch", uid, "(RFC822)")
                 if status != "OK":
-                    print(f"Warning: failed to fetch {uid.decode()}")
+                    logger.warning("Failed to fetch uid=%s — IMAP status: %s", uid.decode(), status)
                     continue
 
                 for part in msg_data:
@@ -50,9 +53,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                     message_id = _optional_str(msg.get("Message-ID"))
                     if not message_id:
                         uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                        print(
-                            f"Skipping email {uid_str}: missing required Message-ID header"
-                        )
+                        logger.warning("Skipping uid=%s: missing required Message-ID header", uid_str)
                         continue
 
                     email_date = None
@@ -61,7 +62,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                         try:
                             email_date = parsedate_to_datetime(date_str)
                         except Exception as e:
-                            print(f"Warning: could not parse date for {uid.decode()}: {e}")
+                            logger.warning("Could not parse date for uid=%s: %s", uid.decode(), e)
 
                     raw_subject = msg.get("Subject")
                     subject = _decode_subject(raw_subject)
@@ -83,7 +84,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                     })
             except Exception as e:
                 uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                print(f"Error processing email {uid_str}: {e}")
+                logger.error("Error processing email uid=%s: %s", uid_str, e)
                 continue
 
         return results
@@ -93,7 +94,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                 mail.close()
                 mail.logout()
             except Exception as e:
-                print(f"Warning: error closing IMAP connection: {e}")
+                logger.warning("Error closing IMAP connection: %s", e)
 
 
 def _extract_body(msg) -> str:

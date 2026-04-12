@@ -238,6 +238,8 @@ def run(worker_run_id: int | None = None) -> int:
 
 def main() -> None:
     """Entry point for `python -m app.worker`. Exits with appropriate code."""
+    from app.logging_config import configure_logging
+    configure_logging()
     sys.exit(run())
 
 
