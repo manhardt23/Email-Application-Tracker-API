@@ -65,8 +65,8 @@ app/
 | 2 | **DB Normalization** ✅ | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic |
 | 3 | **Email Parser** ✅ | Structured BS4 HTML extraction, `Message-ID` dedup |
 | 4 | **LLM → Groq** ✅ | Groq adapter, Protocol abstraction, Ollama for local dev |
-| 5 | **API Cleanup** 🚧 | Full `/api/v1/` endpoints, DB-backed job status |
-| 6 | **Worker Entrypoint** | `app/worker.py` end-to-end, `worker_runs` logging |
+| 5 | **API Cleanup** ✅ | Full `/api/v1/` endpoints, DB-backed job status |
+| 6 | **Worker Entrypoint** 🚧 | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
 | 7 | **Tests** | pytest unit + integration, 70%+ coverage |
 | 8 | **Docker** | Multi-stage Dockerfile, docker-compose for local dev |
 | 9 | **CI/CD** | GitHub Actions: test on PR, build+deploy on merge |
@@ -152,6 +152,42 @@ app/
 ### Chunk 5 (polish & tests)
 - Optional: Pydantic response models for OpenAPI clarity where it helps
 - Tests for new/changed endpoints (happy path, 404, 409 for concurrent job, job status shape)
+
+### Chunk 6 (verification)
+- Run lint/tests for touched files
+- Incremental commits per completed chunk
+
+## Phase 6 Breakdown (manageable chunks)
+
+**Phase:** 6 — Worker entrypoint (cron / Docker)  
+**Already done:** Phases 1–5 on `main` (including `app/worker.py` pipeline, `WorkerRun` queued → running → complete/fail, API `POST /jobs/email-check` wiring, `migrations/001_worker_run_queue_timestamps.sql` for PostgreSQL)  
+**This phase delivers:** A production-grade **standalone worker** suitable for crontab and `docker run … python -m app.worker`: predictable **exit codes**, **logging** you can ship to journald/CloudWatch, **config** knobs for limits/timeouts, and **tests/docs** so operators know how to run and troubleshoot it.
+
+### Chunk 0 (phase bootstrap)
+- Create branch from `main`: `phase6-worker-entrypoint`
+- Keep all Phase 6 work on this branch until the phase is agreed complete
+
+### Chunk 1 (exit contract & operator UX)
+- Define and document **process exit codes** (e.g. `0` success, non-zero for configuration error vs pipeline failure vs “no slot” / concurrency) so cron can alert
+- Ensure fatal misconfiguration fails fast with a clear message before IMAP (invalid `LLM_PROVIDER`, missing DB URL, etc.)
+- Optional: minimal **CLI flags** or env-only contract — pick one style and document it in module docstring + README worker section
+
+### Chunk 2 (logging & correlation)
+- Standardize log lines to include **`worker_run_id`** (and job status transitions) where useful
+- Replace ad-hoc `print` with **`logging`** (module logger), levels appropriate for prod vs dev
+- Optional: single log line format (timestamp, level, run id, message) for grep/journald
+
+### Chunk 3 (resilience & IMAP edge cases)
+- Classify **transient vs permanent** IMAP/network errors; bounded **retries** or clear `WorkerRun.fail` messages where retries are not appropriate
+- Confirm **duplicate / partial fetch** behavior is logged once per decision path (no log spam in large inboxes)
+
+### Chunk 4 (worker-focused configuration)
+- Add or tighten **Pydantic settings** used only by the worker (e.g. IMAP timeout, max messages per run, stale-run TTL if made configurable) with sensible defaults
+- Keep secrets out of logs; validate limits at startup
+
+### Chunk 5 (tests & documentation)
+- Unit tests for **exit code** / early-exit paths (mock IMAP + DB session factory as needed)
+- Short **README** subsection: how to run worker locally, in Docker, and via cron; required env vars; how it relates to `POST /jobs/email-check`
 
 ### Chunk 6 (verification)
 - Run lint/tests for touched files
