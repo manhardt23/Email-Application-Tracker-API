@@ -1,6 +1,6 @@
 # Email Application Tracker API
 
-Backend API for tracking job applications directly from inbox activity. This project is being built in phased increments, and this README is intentionally roadmap-focused so contributors can quickly see what is done, what is in progress, and what is planned next.
+Backend API for tracking job applications directly from inbox activity. This project is being built in phased increments, and this README is intentionally roadmap-focused so contributors can quickly see what is done and what is planned next.
 
 ## Project Goal
 
@@ -23,7 +23,7 @@ Current source-of-truth plan: `PLAN.md`
 | 3 | Email Parser | Complete | BeautifulSoup structured extraction + Message-ID dedup |
 | 4 | LLM -> Groq | Complete | Groq adapter + provider abstraction |
 | 5 | API Cleanup | Complete | Final `/api/v1/` endpoint surface + job status |
-| 6 | Worker Entrypoint | In Progress | Production-grade worker: exit codes, logging, resilience |
+| 6 | Worker Entrypoint | Complete | `python -m app.worker`: exit codes, logging, IMAP retries, worker env config, tests + README operator docs |
 | 7 | Tests | Planned | Unit/integration coverage baseline |
 | 8 | Docker | Planned | Multi-stage image + compose setup |
 | 9 | CI/CD | Planned | GitHub Actions test/build/deploy flow |
