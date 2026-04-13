@@ -3,6 +3,13 @@ name = "email-application-tracker"
 version = "0.1.0"
 requires-python = ">=3.12"
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "httpx",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -17,3 +24,6 @@ markers = [
     "integration: marks tests that require a real (or in-memory) DB and a running app",
     "slow: marks tests that are expected to be slow",
 ]
+# Coverage gate — enforced in CI (Phase 9).
+# Run locally: pytest --cov=app --cov-fail-under=70
+addopts = "--cov=app --cov-report=term-missing --cov-fail-under=70"

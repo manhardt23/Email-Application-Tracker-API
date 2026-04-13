@@ -24,7 +24,7 @@ Current source-of-truth plan: `PLAN.md`
 | 4 | LLM -> Groq | Complete | Groq adapter + provider abstraction |
 | 5 | API Cleanup | Complete | Final `/api/v1/` endpoint surface + job status |
 | 6 | Worker Entrypoint | Complete | `python -m app.worker`: exit codes, logging, IMAP retries, worker env config, tests + README operator docs |
-| 7 | Tests | Planned | Unit/integration coverage baseline |
+| 7 | Tests | Complete | pytest unit + integration, 83% line coverage, ≥70% gate in pyproject.toml |
 | 8 | Docker | Planned | Multi-stage image + compose setup |
 | 9 | CI/CD | Planned | GitHub Actions test/build/deploy flow |
 | 10 | AWS Deployment | Planned | EC2 deployment with host PostgreSQL + cron scheduling |
@@ -138,6 +138,31 @@ docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 ### Relationship to `POST /jobs/email-check`
 
 The API endpoint creates a `WorkerRun` row in `queued` state and fires the worker in a background thread passing the `worker_run_id`. The worker claims the row (`queued → running`) and updates it to `completed` or `failed`. Cron/manual invocations create their own row. Only one active run is permitted at a time (enforced by a partial unique index on `worker_runs`).
+
+## Testing
+
+Tests live in `tests/unit/` and `tests/integration/`.  
+All tests use SQLite in-memory — no running database required.
+
+```bash
+# Run all tests with coverage (gate: ≥70% line coverage)
+pytest
+
+# Run only unit tests
+pytest tests/unit/
+
+# Run only integration tests
+pytest -m integration
+
+# Skip integration tests
+pytest -m "not integration"
+
+# Print coverage report without the per-file detail
+pytest --cov=app --cov-report=term
+```
+
+The `≥70%` gate is enforced via `addopts` in `pyproject.toml` and will be wired into CI in Phase 9.  
+Current baseline: **≥83%** line coverage.
 
 ## Local Development (Target Workflow)
 
