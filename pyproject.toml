@@ -13,3 +13,7 @@ ignore = ["E712"]  # Allow `== True` in SQLAlchemy filter expressions
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests that require a real (or in-memory) DB and a running app",
+    "slow: marks tests that are expected to be slow",
+]
