@@ -3,7 +3,8 @@ Unit tests for DB repositories using SQLite in-memory.
 
 Covers: EmailRepository, AnalysisRepository, ApplicationRepository,
         CompanyRepository, WorkerRunRepository.
-Uses the shared conftest fixtures (db, fresh_db).
+Uses this module's fixtures ``session`` and ``_fresh`` (isolated engine in
+``_engine`` / ``_Session``), not the integration ``conftest`` ``db`` / ``fresh_db``.
 """
 from datetime import UTC, datetime, timedelta
 

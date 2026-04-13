@@ -95,6 +95,7 @@ def test_application_lifecycle(client, db):
 
     # verify update persisted via a second GET
     verify_resp = client.get(f"/api/v1/applications/{app.id}")
+    assert verify_resp.status_code == 200
     assert verify_resp.json()["stage"] == "interview"
 
 
@@ -111,7 +112,9 @@ def test_list_applications_stage_filter(client, db):
 @pytest.mark.integration
 def test_update_application_notes_clears(client, db):
     app = _seed_company_and_application(db)
-    client.put(f"/api/v1/applications/{app.id}", json={"notes": "initial"})
+    resp1 = client.put(f"/api/v1/applications/{app.id}", json={"notes": "initial"})
+    assert resp1.status_code == 200
+    assert resp1.json()["notes"] == "initial"
     resp = client.put(f"/api/v1/applications/{app.id}", json={"notes": None})
     assert resp.status_code == 200
     assert resp.json()["notes"] is None
