@@ -27,7 +27,6 @@ EXIT_PIPELINE    (1)  — unexpected pipeline failure; WorkerRun row marked 'fai
 """
 import logging
 import sys
-import traceback
 from datetime import datetime, timezone
 
 from app.config import get_settings
@@ -99,6 +98,7 @@ def run(worker_run_id: int | None = None) -> int:
     processor = None
     try:
         run_repo.reconcile_stale_worker_runs(max_age_minutes=settings.stale_run_ttl_minutes)
+        session.commit()
 
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)
@@ -128,8 +128,8 @@ def run(worker_run_id: int | None = None) -> int:
             logger.info("Created and claimed cron/manual WorkerRun id=%s", worker_run.id)
 
         run_id = worker_run.id
-        # max_emails_per_run is the canonical limit; email_limit kept for compat.
-        effective_limit = min(settings.max_emails_per_run, settings.email_limit)
+        # Prefer the higher of the two caps so MAX_EMAILS_PER_RUN is not capped by legacy EMAIL_LIMIT.
+        effective_limit = max(settings.max_emails_per_run, settings.email_limit)
         logger.info("run_id=%s fetching up to %d emails", worker_run.id, effective_limit)
 
         classifier = build_classifier(settings)
@@ -218,8 +218,11 @@ def run(worker_run_id: int | None = None) -> int:
                     run_repo.fail(wr, str(exc))
                     session.commit()
             except Exception as secondary:
-                logger.error("Failed to persist WorkerRun failure state: %s", secondary)
-                traceback.print_exc()
+                logger.error(
+                    "Failed to persist WorkerRun failure state: %s",
+                    secondary,
+                    exc_info=True,
+                )
         logger.exception("Pipeline failed: %s", exc)
         return EXIT_PIPELINE
     finally:

@@ -29,8 +29,7 @@ _CONNECT_MAX_ATTEMPTS = 2
 def _connect_to_inbox(timeout: int | None = None):
     settings = get_settings()
     imap_timeout = timeout if timeout is not None else getattr(settings, "imap_timeout_seconds", 30)
-    socket.setdefaulttimeout(imap_timeout)
-    mail = imaplib.IMAP4_SSL(settings.imap_server)
+    mail = imaplib.IMAP4_SSL(settings.imap_server, timeout=imap_timeout)
     mail.login(settings.email_user, settings.email_pass)
     mail.select("inbox")
     return mail
@@ -142,12 +141,16 @@ def fetch_recent_emails(limit: int) -> list[dict]:
 
 
 def _close_mail(mail) -> None:
-    if mail:
-        try:
-            mail.close()
-            mail.logout()
-        except Exception as e:
-            logger.warning("Error closing IMAP connection: %s", e)
+    if not mail:
+        return
+    try:
+        mail.close()
+    except Exception as e:
+        logger.warning("IMAP close() failed: %s", e)
+    try:
+        mail.logout()
+    except Exception as e:
+        logger.warning("IMAP logout() failed: %s", e)
 
 
 def _extract_body(msg) -> str:

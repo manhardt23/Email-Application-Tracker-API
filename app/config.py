@@ -38,6 +38,13 @@ class Settings(BaseSettings):
             raise ValueError("IMAP_TIMEOUT_SECONDS must be a positive integer")
         return v
 
+    @field_validator("email_limit")
+    @classmethod
+    def _positive_email_limit(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("EMAIL_LIMIT must be a positive integer")
+        return v
+
     @field_validator("max_emails_per_run")
     @classmethod
     def _positive_max_emails(cls, v: int) -> int:
@@ -57,7 +64,7 @@ class Settings(BaseSettings):
         return (
             f"provider={self.llm_provider} imap_server={self.imap_server} "
             f"imap_timeout={self.imap_timeout_seconds}s "
-            f"max_emails={self.max_emails_per_run} "
+            f"email_limit={self.email_limit} max_emails={self.max_emails_per_run} "
             f"stale_ttl={self.stale_run_ttl_minutes}m"
         )
 
