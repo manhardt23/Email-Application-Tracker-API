@@ -67,7 +67,7 @@ app/
 | 4 | **LLM → Groq** ✅ | Groq adapter, Protocol abstraction, Ollama for local dev |
 | 5 | **API Cleanup** ✅ | Full `/api/v1/` endpoints, DB-backed job status |
 | 6 | **Worker Entrypoint** ✅ | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
-| 7 | **Tests** | pytest unit + integration, 70%+ coverage |
+| 7 | **Tests** 🚧 | pytest unit + integration, **≥70%** line coverage, CI-ready test commands |
 | 8 | **Docker** | Multi-stage Dockerfile, docker-compose for local dev |
 | 9 | **CI/CD** | GitHub Actions: test on PR, build+deploy on merge |
 | 10 | **AWS Deployment** | EC2 + PostgreSQL + systemd + crontab + Secrets Manager |
@@ -191,4 +191,38 @@ app/
 
 ### Chunk 6 (verification)
 - Run lint/tests for touched files
+- Incremental commits per completed chunk
+
+## Phase 7 Breakdown (manageable chunks)
+
+**Phase:** 7 — Tests & coverage baseline  
+**Already done:** Phases 1–6 on `main` (unit tests exist per phase: `tests/unit/test_phase3_email_parser.py`, `test_phase4_llm_providers.py`, `test_phase5_api.py`, `test_phase6_worker.py`; no repo-wide coverage gate yet)  
+**This phase delivers:** A **repeatable pytest setup** for unit + integration tests, **shared fixtures** where they reduce duplication, **meaningful coverage** of repositories/services/API paths not yet exercised, a documented **`coverage run` / `coverage report`** workflow targeting **≥70%** line coverage, and a **single command** (documented in `README` or `PLAN`) that CI can call later in Phase 9.
+
+### Chunk 0 (phase bootstrap)
+- Create branch from `main`: `phase7-test-coverage` (hyphenated; keeps branch names grep-friendly)
+- Keep all Phase 7 work on this branch until the phase is agreed complete
+
+### Chunk 1 (pytest layout & markers)
+- Confirm or add **`pytest.ini`** / **`pyproject.toml`** `[tool.pytest.ini_options]` — `testpaths`, asyncio mode if needed, optional markers (`integration`, `slow`)
+- Normalize **`tests/unit/`** vs **`tests/integration/`** naming; ensure `tests/conftest.py` (root) can hold shared fixtures without circular imports
+
+### Chunk 2 (unit coverage — gaps)
+- Identify modules below reasonable coverage (repositories, `app/services`, `app/api/v1` routes not covered by phase-specific files)
+- Add focused unit tests with mocks; avoid testing implementation trivia — assert behavior and error paths
+
+### Chunk 3 (integration tests)
+- Add **`tests/integration/`** tests that spin up the FastAPI app (or key routers) with a **test database** (SQLite in-memory + dependency overrides, or transactional PostgreSQL pattern — pick one and document)
+- Cover at least one happy-path flow that crosses API → DB (e.g. health + one CRUD-style route if fixtures allow)
+
+### Chunk 4 (coverage gate & docs)
+- Add **`coverage`** / **`pytest-cov`** to dev dependencies if not present; document **`pytest --cov=app --cov-fail-under=70`** (or equivalent) in `README` or a short comment in `pyproject.toml`
+- If **70%** is not yet reachable in one pass, document current % and ratchet plan — prefer failing CI later (Phase 9) over silently lowering the bar
+
+### Chunk 5 (fixtures & hygiene)
+- Extract repeated test setup (DB session, app client, seed helpers) into **`conftest.py`** fixtures
+- Address flaky patterns (time-dependent tests, unordered collections) early
+
+### Chunk 6 (verification)
+- Run full **`pytest`** + **`coverage report`** locally; fix lint on touched files
 - Incremental commits per completed chunk
