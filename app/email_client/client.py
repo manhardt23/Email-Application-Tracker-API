@@ -30,8 +30,12 @@ def _connect_to_inbox(timeout: int | None = None):
     settings = get_settings()
     imap_timeout = timeout if timeout is not None else getattr(settings, "imap_timeout_seconds", 30)
     mail = imaplib.IMAP4_SSL(settings.imap_server, timeout=imap_timeout)
-    mail.login(settings.email_user, settings.email_pass)
-    mail.select("inbox")
+    try:
+        mail.login(settings.email_user, settings.email_pass)
+        mail.select("inbox")
+    except Exception:
+        _close_mail(mail)
+        raise
     return mail
 
 
@@ -49,6 +53,8 @@ def fetch_recent_emails(limit: int) -> list[dict]:
             mail = _connect_to_inbox()
             status, data = mail.uid("search", None, "ALL")
             if status != "OK":
+                _close_mail(mail)
+                mail = None
                 raise RuntimeError(f"IMAP search failed: {status}")
             break
         except _TRANSIENT_IMAP_ERRORS as exc:
