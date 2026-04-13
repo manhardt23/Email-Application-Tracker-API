@@ -1,6 +1,9 @@
 import email
 import imaplib
+import logging
 import re
+import socket
+import time
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -9,36 +12,90 @@ from bs4 import BeautifulSoup
 
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
 
-def _connect_to_inbox():
+# Errors that are worth retrying once (network blip, server reset, timeout).
+# imaplib.IMAP4.abort is raised on broken connections; OSError/socket.timeout
+# cover TCP-level failures. imaplib.IMAP4.error is a permanent protocol error
+# (bad credentials, mailbox not found) — do NOT retry those.
+_TRANSIENT_IMAP_ERRORS = (imaplib.IMAP4.abort, OSError, socket.timeout, TimeoutError)
+
+# Single retry with a short back-off — keeps cron jobs fast while surviving
+# transient server resets (Comcast IMAP is occasionally flaky).
+_CONNECT_RETRY_DELAY_SECONDS = 2
+_CONNECT_MAX_ATTEMPTS = 2
+
+
+def _connect_to_inbox(timeout: int | None = None):
     settings = get_settings()
-    mail = imaplib.IMAP4_SSL(settings.imap_server)
-    mail.login(settings.email_user, settings.email_pass)
-    mail.select("inbox")
+    imap_timeout = timeout if timeout is not None else getattr(settings, "imap_timeout_seconds", 30)
+    mail = imaplib.IMAP4_SSL(settings.imap_server, timeout=imap_timeout)
+    try:
+        mail.login(settings.email_user, settings.email_pass)
+        mail.select("inbox")
+    except Exception:
+        _close_mail(mail)
+        raise
     return mail
 
 
 def fetch_recent_emails(limit: int) -> list[dict]:
-    mail = None
-    try:
-        mail = _connect_to_inbox()
-        status, data = mail.uid("search", None, "ALL")
-        if status != "OK":
-            raise RuntimeError(f"IMAP search failed: {status}")
+    """Fetch up to *limit* most-recent emails from the inbox.
 
+    Retries the connect+search phase once on transient network errors. Per-message
+    fetch errors are logged and skipped without aborting the whole run (no log spam).
+    """
+    last_exc: Exception | None = None
+    mail = None
+
+    for attempt in range(1, _CONNECT_MAX_ATTEMPTS + 1):
+        try:
+            mail = _connect_to_inbox()
+            status, data = mail.uid("search", None, "ALL")
+            if status != "OK":
+                _close_mail(mail)
+                mail = None
+                raise RuntimeError(f"IMAP search failed: {status}")
+            break
+        except _TRANSIENT_IMAP_ERRORS as exc:
+            last_exc = exc
+            _close_mail(mail)
+            mail = None
+            if attempt < _CONNECT_MAX_ATTEMPTS:
+                logger.warning(
+                    "Transient IMAP error on attempt %d/%d: %s — retrying in %ds",
+                    attempt,
+                    _CONNECT_MAX_ATTEMPTS,
+                    exc,
+                    _CONNECT_RETRY_DELAY_SECONDS,
+                )
+                time.sleep(_CONNECT_RETRY_DELAY_SECONDS)
+            else:
+                logger.error(
+                    "IMAP connection failed after %d attempts: %s", _CONNECT_MAX_ATTEMPTS, exc
+                )
+                raise
+        except imaplib.IMAP4.error as exc:
+            # Permanent error (auth failure, bad mailbox) — fail fast, no retry.
+            logger.error("Permanent IMAP error: %s", exc)
+            _close_mail(mail)
+            raise
+
+    try:
         if not data or not data[0]:
-            print("No emails found in inbox")
+            logger.info("No emails found in inbox")
             return []
 
         mail_uids = data[0].split()
         recent_uids = mail_uids[-limit:] if len(mail_uids) > limit else mail_uids
+        logger.debug("IMAP search returned %d UIDs; processing last %d", len(mail_uids), len(recent_uids))
 
         results = []
         for uid in recent_uids:
             try:
                 status, msg_data = mail.uid("fetch", uid, "(RFC822)")
                 if status != "OK":
-                    print(f"Warning: failed to fetch {uid.decode()}")
+                    logger.warning("Failed to fetch uid=%s — IMAP status: %s", uid.decode(), status)
                     continue
 
                 for part in msg_data:
@@ -50,9 +107,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                     message_id = _optional_str(msg.get("Message-ID"))
                     if not message_id:
                         uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                        print(
-                            f"Skipping email {uid_str}: missing required Message-ID header"
-                        )
+                        logger.warning("Skipping uid=%s: missing required Message-ID header", uid_str)
                         continue
 
                     email_date = None
@@ -61,7 +116,7 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                         try:
                             email_date = parsedate_to_datetime(date_str)
                         except Exception as e:
-                            print(f"Warning: could not parse date for {uid.decode()}: {e}")
+                            logger.warning("Could not parse date for uid=%s: %s", uid.decode(), e)
 
                     raw_subject = msg.get("Subject")
                     subject = _decode_subject(raw_subject)
@@ -83,17 +138,25 @@ def fetch_recent_emails(limit: int) -> list[dict]:
                     })
             except Exception as e:
                 uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                print(f"Error processing email {uid_str}: {e}")
+                logger.error("Error processing email uid=%s: %s", uid_str, e)
                 continue
 
         return results
     finally:
-        if mail:
-            try:
-                mail.close()
-                mail.logout()
-            except Exception as e:
-                print(f"Warning: error closing IMAP connection: {e}")
+        _close_mail(mail)
+
+
+def _close_mail(mail) -> None:
+    if not mail:
+        return
+    try:
+        mail.close()
+    except Exception as e:
+        logger.warning("IMAP close() failed: %s", e)
+    try:
+        mail.logout()
+    except Exception as e:
+        logger.warning("IMAP logout() failed: %s", e)
 
 
 def _extract_body(msg) -> str:

@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime
 from time import perf_counter
 
 from app.email_client.client import fetch_recent_emails
 from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification, LLMClassifier
+
+logger = logging.getLogger(__name__)
 
 
 class EmailData:
@@ -36,8 +39,9 @@ class EmailData:
         """Run LLM classification. Returns True if the email is a job application."""
         provider = getattr(classifier, "provider_name", "unknown")
         if not quick_filter(self.sender, self.subject, self.body):
-            print("Quick filter: not an application email, skipping LLM")
-            print(f"LLM classify provider={provider} latency_ms=0 outcome=filtered")
+            logger.debug(
+                "quick_filter=rejected provider=%s latency_ms=0 outcome=filtered", provider
+            )
             self.is_application = False
             return False
 
@@ -47,9 +51,10 @@ class EmailData:
         )
         latency_ms = (perf_counter() - start) * 1000
         if result is None:
-            print(
-                f"LLM classify provider={provider} "
-                f"latency_ms={latency_ms:.2f} outcome=no_classification"
+            logger.warning(
+                "LLM classify provider=%s latency_ms=%.2f outcome=no_classification",
+                provider,
+                latency_ms,
             )
             self.is_application = False
             return False
@@ -59,10 +64,12 @@ class EmailData:
         self.position = result.position
         self.stage = result.stage
         self.confidence = result.confidence
-        print(
-            f"LLM classify provider={provider} "
-            f"latency_ms={latency_ms:.2f} outcome={bool(result.is_application)} "
-            f"confidence={result.confidence}"
+        logger.info(
+            "LLM classify provider=%s latency_ms=%.2f outcome=%s confidence=%s",
+            provider,
+            latency_ms,
+            bool(result.is_application),
+            result.confidence,
         )
         return bool(result.is_application)
 
@@ -95,7 +102,7 @@ class EmailProcessor:
             )
             for raw in raw_emails
         ]
-        print(f"Fetched {len(self.email_list)} emails")
+        logger.info("Fetched %d emails from IMAP", len(self.email_list))
         return self.email_list
 
     def analyze_emails(self) -> list[EmailData]:
@@ -103,7 +110,7 @@ class EmailProcessor:
             if email_data.classify(self.classifier):
                 self.application_emails.append(email_data)
             else:
-                print("Not an application email — skipped")
+                logger.debug("Not an application email — skipped")
         return self.application_emails
 
     def get_high_confidence(self) -> list[EmailData]:

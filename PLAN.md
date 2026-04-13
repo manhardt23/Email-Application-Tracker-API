@@ -66,7 +66,7 @@ app/
 | 3 | **Email Parser** ✅ | Structured BS4 HTML extraction, `Message-ID` dedup |
 | 4 | **LLM → Groq** ✅ | Groq adapter, Protocol abstraction, Ollama for local dev |
 | 5 | **API Cleanup** ✅ | Full `/api/v1/` endpoints, DB-backed job status |
-| 6 | **Worker Entrypoint** 🚧 | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
+| 6 | **Worker Entrypoint** ✅ | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
 | 7 | **Tests** | pytest unit + integration, 70%+ coverage |
 | 8 | **Docker** | Multi-stage Dockerfile, docker-compose for local dev |
 | 9 | **CI/CD** | GitHub Actions: test on PR, build+deploy on merge |
@@ -159,13 +159,13 @@ app/
 
 ## Phase 6 Breakdown (manageable chunks)
 
-**Phase:** 6 — Worker entrypoint (cron / Docker)  
+**Phase:** 6 — Worker entrypoint (cron / Docker) — **✅ complete**  
 **Already done:** Phases 1–5 on `main` (including `app/worker.py` pipeline, `WorkerRun` queued → running → complete/fail, API `POST /jobs/email-check` wiring, `migrations/001_worker_run_queue_timestamps.sql` for PostgreSQL)  
-**This phase delivers:** A production-grade **standalone worker** suitable for crontab and `docker run … python -m app.worker`: predictable **exit codes**, **logging** you can ship to journald/CloudWatch, **config** knobs for limits/timeouts, and **tests/docs** so operators know how to run and troubleshoot it.
+**This phase delivered:** A production-grade **standalone worker** suitable for crontab and `docker run … python -m app.worker`: predictable **exit codes**, **logging** (`app/logging_config.py`, module loggers), **config** knobs (`IMAP_TIMEOUT_SECONDS`, `MAX_EMAILS_PER_RUN`, `STALE_RUN_TTL_MINUTES`, etc.), **IMAP connect retries** with transient vs permanent errors in `email_client/client.py`, **tests** (`tests/unit/test_phase6_worker.py`), and **README** operator docs (`python -m app.worker`, Docker, cron, exit codes).
 
 ### Chunk 0 (phase bootstrap)
-- Create branch from `main`: `phase6-worker-entrypoint`
-- Keep all Phase 6 work on this branch until the phase is agreed complete
+- Branch from `main`: `phase6-worker-entrypoint` (used for Phase 6 implementation)
+- Phase complete — merge to `main` per repo workflow when ready
 
 ### Chunk 1 (exit contract & operator UX)
 - Define and document **process exit codes** (e.g. `0` success, non-zero for configuration error vs pipeline failure vs “no slot” / concurrency) so cron can alert

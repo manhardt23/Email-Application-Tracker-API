@@ -50,18 +50,19 @@ def _build_email_bytes(
     return msg.as_bytes()
 
 
-def test_fetch_recent_emails_skips_when_message_id_missing(monkeypatch, capsys):
+def test_fetch_recent_emails_skips_when_message_id_missing(monkeypatch, caplog):
+    import logging
     raw_with_id = _build_email_bytes(message_id="<id-1@example.test>")
     raw_missing_id = _build_email_bytes(message_id=None)
     fake_mail = _FakeMail({b"1": raw_with_id, b"2": raw_missing_id})
     monkeypatch.setattr(client, "_connect_to_inbox", lambda: fake_mail)
 
-    results = client.fetch_recent_emails(limit=10)
+    with caplog.at_level(logging.WARNING):
+        results = client.fetch_recent_emails(limit=10)
 
     assert len(results) == 1
     assert results[0]["message_id"] == "<id-1@example.test>"
-    output = capsys.readouterr().out
-    assert "missing required Message-ID header" in output
+    assert "missing required Message-ID header" in caplog.text
 
 
 def test_fetch_recent_emails_includes_soft_required_nullable_keys(monkeypatch):
@@ -83,7 +84,9 @@ def test_fetch_recent_emails_includes_soft_required_nullable_keys(monkeypatch):
     assert isinstance(parsed["raw_headers"], dict)
 
 
-def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
+def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
+    import logging
+
     import app.config as app_config
 
     monkeypatch.setattr(
@@ -107,7 +110,7 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
         def __init__(self, session):  # noqa: ANN001
             self._run = _FakeWorkerRun()
 
-        def reconcile_stale_worker_runs(self) -> None:
+        def reconcile_stale_worker_runs(self, max_age_minutes=1440) -> None:
             return None
 
         def get_by_id(self, run_id):  # noqa: ANN001
@@ -195,9 +198,16 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
         def get_needs_review(self):
             return []
 
-    monkeypatch.setattr(worker_module, "get_settings", lambda: SimpleNamespace(email_limit=1))
+    def _fake_settings():
+        return SimpleNamespace(
+            llm_provider="ollama", groq_api_key=None,
+            email_limit=1, max_emails_per_run=50, stale_run_ttl_minutes=1440,
+            safe_summary=lambda: "test"
+        )
+
+    monkeypatch.setattr(worker_module, "get_settings", _fake_settings)
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
-    monkeypatch.setattr(worker_module, "_build_classifier", lambda: object())
+    monkeypatch.setattr(worker_module, "build_classifier", lambda settings: object())
     monkeypatch.setattr(worker_module, "EmailProcessor", _FakeProcessor)
     monkeypatch.setattr(worker_module, "SessionLocal", lambda: _FakeSession())
     monkeypatch.setattr(worker_module, "WorkerRunRepository", _FakeWorkerRunRepository)
@@ -206,10 +216,10 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, capsys):
     monkeypatch.setattr(worker_module, "ApplicationRepository", _FakeApplicationRepository)
     monkeypatch.setattr(worker_module, "AnalysisRepository", _FakeAnalysisRepository)
 
-    worker_module.run()
+    with caplog.at_level(logging.DEBUG):
+        worker_module.run()
 
-    output = capsys.readouterr().out
-    assert "Duplicate email — skipping: <dup@example.test>" in output
+    assert "duplicate email" in caplog.text.lower()
 
 
 def test_fetch_recent_emails_happy_path_full_parse(monkeypatch):
@@ -345,7 +355,7 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def __init__(self, session):  # noqa: ANN001
             self._run = _FakeWorkerRun()
 
-        def reconcile_stale_worker_runs(self) -> None:
+        def reconcile_stale_worker_runs(self, max_age_minutes=1440) -> None:
             return None
 
         def get_by_id(self, run_id):  # noqa: ANN001
@@ -445,9 +455,16 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def get_needs_review(self):
             return []
 
-    monkeypatch.setattr(worker_module, "get_settings", lambda: SimpleNamespace(email_limit=1))
+    def _fake_settings():
+        return SimpleNamespace(
+            llm_provider="ollama", groq_api_key=None,
+            email_limit=1, max_emails_per_run=50, stale_run_ttl_minutes=1440,
+            safe_summary=lambda: "test"
+        )
+
+    monkeypatch.setattr(worker_module, "get_settings", _fake_settings)
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
-    monkeypatch.setattr(worker_module, "_build_classifier", lambda: object())
+    monkeypatch.setattr(worker_module, "build_classifier", lambda settings: object())
     monkeypatch.setattr(worker_module, "EmailProcessor", _FakeProcessor)
     monkeypatch.setattr(worker_module, "SessionLocal", lambda: _FakeSession())
     monkeypatch.setattr(worker_module, "WorkerRunRepository", _FakeWorkerRunRepository)
@@ -462,7 +479,9 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     assert created_message_ids[0] == "<new@example.test>"
 
 
-def test_worker_handles_zero_application_emails(monkeypatch, capsys):
+def test_worker_handles_zero_application_emails(monkeypatch, caplog):
+    import logging
+
     import app.config as app_config
 
     monkeypatch.setattr(
@@ -486,7 +505,7 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
         def __init__(self, session):  # noqa: ANN001
             self._run = _FakeWorkerRun()
 
-        def reconcile_stale_worker_runs(self) -> None:
+        def reconcile_stale_worker_runs(self, max_age_minutes=1440) -> None:
             return None
 
         def try_create_queued_run(self):  # noqa: ANN001
@@ -532,15 +551,22 @@ def test_worker_handles_zero_application_emails(monkeypatch, capsys):
         def get_needs_review(self):
             return []
 
-    monkeypatch.setattr(worker_module, "get_settings", lambda: SimpleNamespace(email_limit=1))
+    def _fake_settings():
+        return SimpleNamespace(
+            llm_provider="ollama", groq_api_key=None,
+            email_limit=1, max_emails_per_run=50, stale_run_ttl_minutes=1440,
+            safe_summary=lambda: "test"
+        )
+
+    monkeypatch.setattr(worker_module, "get_settings", _fake_settings)
     monkeypatch.setattr(worker_module.models.Base.metadata, "create_all", lambda bind: None)
-    monkeypatch.setattr(worker_module, "_build_classifier", lambda: object())
+    monkeypatch.setattr(worker_module, "build_classifier", lambda settings: object())
     monkeypatch.setattr(worker_module, "EmailProcessor", _FakeProcessor)
     monkeypatch.setattr(worker_module, "SessionLocal", lambda: _FakeSession())
     monkeypatch.setattr(worker_module, "WorkerRunRepository", _FakeWorkerRunRepository)
 
-    worker_module.run()
+    with caplog.at_level(logging.INFO):
+        worker_module.run()
 
-    output = capsys.readouterr().out
-    # Zero emails fetched — summary still printed
-    assert "Fetched:       0" in output
+    # Zero emails fetched — completion logged
+    assert "fetched=0" in caplog.text
