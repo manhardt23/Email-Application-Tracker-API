@@ -10,8 +10,6 @@ All DB and IMAP interactions are mocked. Tests focus on:
 """
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.worker import (
     EXIT_CONFIG,
     EXIT_NO_SLOT,
@@ -20,7 +18,6 @@ from app.worker import (
     _validate_config,
     run,
 )
-
 
 # ---------------------------------------------------------------------------
 # _validate_config unit tests
