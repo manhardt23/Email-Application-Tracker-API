@@ -13,8 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.db.models import Application, Company, Email, EmailAnalysis, WorkerRun
-
+from app.db.models import Application, Company, Email, EmailAnalysis
 
 # ---------------------------------------------------------------------------
 # Helpers

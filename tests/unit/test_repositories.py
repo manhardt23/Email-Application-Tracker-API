@@ -5,14 +5,14 @@ Covers: EmailRepository, AnalysisRepository, ApplicationRepository,
         CompanyRepository, WorkerRunRepository.
 Uses the shared conftest fixtures (db, fresh_db).
 """
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Company, Email, WorkerRun
+from app.db.models import Base, Company, WorkerRun
 from app.db.repositories.analysis_repo import AnalysisRepository
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
@@ -169,8 +169,12 @@ class TestAnalysisRepository:
         email1 = _create_email(session, message_id="<m2@test>", uid="uid-2")
         email2 = _create_email(session, message_id="<m3@test>", uid="uid-3")
         repo = AnalysisRepository(session)
-        repo.create(email1.id, EmailClassification(is_application=True, confidence="high"), model_used="m")
-        repo.create(email2.id, EmailClassification(is_application=False, confidence="low"), model_used="m")
+        repo.create(
+            email1.id, EmailClassification(is_application=True, confidence="high"), model_used="m"
+        )
+        repo.create(
+            email2.id, EmailClassification(is_application=False, confidence="low"), model_used="m"
+        )
         session.commit()
         needs_review = repo.get_needs_review()
         assert len(needs_review) == 1
@@ -179,7 +183,9 @@ class TestAnalysisRepository:
     def test_link_to_application(self, session):
         email = _create_email(session)
         repo = AnalysisRepository(session)
-        analysis = repo.create(email.id, EmailClassification(is_application=True, confidence="high"), model_used="m")
+        analysis = repo.create(
+            email.id, EmailClassification(is_application=True, confidence="high"), model_used="m"
+        )
         session.commit()
         repo.link_to_application(analysis, 42)
         assert analysis.application_id == 42
@@ -190,7 +196,12 @@ class TestAnalysisRepository:
         session.flush()
         email = _create_email(session)
         repo = AnalysisRepository(session)
-        repo.create(email.id, EmailClassification(is_application=True, confidence="high"), model_used="m", worker_run_id=run.id)
+        repo.create(
+            email.id,
+            EmailClassification(is_application=True, confidence="high"),
+            model_used="m",
+            worker_run_id=run.id,
+        )
         session.commit()
         results = repo.get_by_worker_run(run.id)
         assert len(results) == 1
@@ -254,7 +265,7 @@ class TestApplicationRepository:
         repo = ApplicationRepository(session)
         application = repo.find_or_create(company.id, "Analyst")
         session.commit()
-        newer_date = datetime.now(timezone.utc) + timedelta(days=1)
+        newer_date = datetime.now(UTC) + timedelta(days=1)
         repo.update_stage(application, "interview", newer_date)
         assert application.stage == "interview"
 
@@ -278,7 +289,7 @@ class TestApplicationRepository:
         repo = ApplicationRepository(session)
         application = repo.find_or_create(company.id, "Dev")
         session.commit()
-        repo.update_stage(application, None, datetime.now(timezone.utc))
+        repo.update_stage(application, None, datetime.now(UTC))
         assert application.stage == "applied"
 
 
@@ -364,7 +375,7 @@ class TestWorkerRunRepository:
         assert repo.get_by_id(9999) is None
 
     def test_get_recent_returns_ordered_runs(self, session):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         r1 = WorkerRun(status="completed", queued_at=now - timedelta(minutes=10))
         r2 = WorkerRun(status="completed", queued_at=now - timedelta(minutes=1))
         session.add(r1)
@@ -379,7 +390,7 @@ class TestWorkerRunRepository:
     def test_reconcile_stale_marks_old_queued_as_failed(self, session):
         old_run = WorkerRun(
             status="queued",
-            queued_at=datetime.now(timezone.utc) - timedelta(minutes=9999),
+            queued_at=datetime.now(UTC) - timedelta(minutes=9999),
         )
         session.add(old_run)
         session.commit()

@@ -5,12 +5,9 @@ Covers: GET /health, GET /applications (list + stage filter + 404),
         GET /applications/{id}.
 Uses shared conftest fixtures.
 """
-from datetime import datetime
 
-import pytest
 
 from app.db.models import Application, Company
-
 
 # ---------------------------------------------------------------------------
 # Helpers

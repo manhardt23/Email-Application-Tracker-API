@@ -74,9 +74,13 @@ class TestNormalizeClassification:
         assert result.confidence == "low"
 
     def test_none_stage_preserved(self):
-        result = normalize_classification({"is_application": False, "stage": None, "confidence": "high"})
+        result = normalize_classification(
+            {"is_application": False, "stage": None, "confidence": "high"}
+        )
         assert result.stage is None
 
     def test_numeric_stage_cast_to_string(self):
-        result = normalize_classification({"is_application": True, "stage": 3, "confidence": "medium"})
+        result = normalize_classification(
+            {"is_application": True, "stage": 3, "confidence": "medium"}
+        )
         assert result.stage == "3"
