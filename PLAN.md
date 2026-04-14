@@ -67,9 +67,9 @@ app/
 | 4 | **LLM → Groq** ✅ | Groq adapter, Protocol abstraction, Ollama for local dev |
 | 5 | **API Cleanup** ✅ | Full `/api/v1/` endpoints, DB-backed job status |
 | 6 | **Worker Entrypoint** ✅ | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
-| 7 | **Tests** 🚧 | pytest unit + integration, **≥70%** line coverage, CI-ready test commands |
-| 8 | **Docker** | Multi-stage Dockerfile, docker-compose for local dev |
-| 9 | **CI/CD** | GitHub Actions: test on PR, build+deploy on merge |
+| 7 | **Tests** ✅ | pytest unit + integration, **≥70%** line coverage, CI-ready test commands |
+| 8 | **Docker** ✅ | Multi-stage Dockerfile, docker-compose for local dev |
+| 9 | **CI/CD** ✅ | GitHub Actions: test on PR/push, ECR image push + SSH deploy on `main` |
 | 10 | **AWS Deployment** | EC2 + PostgreSQL + systemd + crontab + Secrets Manager |
 
 ## Key Notes

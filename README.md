@@ -25,8 +25,8 @@ Current source-of-truth plan: `PLAN.md`
 | 5 | API Cleanup | Complete | Final `/api/v1/` endpoint surface + job status |
 | 6 | Worker Entrypoint | Complete | `python -m app.worker`: exit codes, logging, IMAP retries, worker env config, tests + README operator docs |
 | 7 | Tests | Complete | pytest unit + integration, 83% line coverage, ≥70% gate in pyproject.toml |
-| 8 | Docker | Planned | Multi-stage image + compose setup |
-| 9 | CI/CD | Planned | GitHub Actions test/build/deploy flow |
+| 8 | Docker | Complete | Multi-stage image + compose setup |
+| 9 | CI/CD | Complete | GitHub Actions: test on PR/push, ECR + EC2 deploy on `main` |
 | 10 | AWS Deployment | Planned | EC2 deployment with host PostgreSQL + cron scheduling |
 
 ## Planned Architecture
@@ -161,8 +161,30 @@ pytest -m "not integration"
 pytest --cov=app --cov-report=term
 ```
 
-The `≥70%` gate is enforced via `addopts` in `pyproject.toml` and will be wired into CI in Phase 9.  
+The `≥70%` gate is enforced via `addopts` in `pyproject.toml` and in GitHub Actions on every PR and push.  
 Current baseline: **≥83%** line coverage.
+
+## CI/CD (GitHub Actions)
+
+Workflow: `.github/workflows/ci.yml`.
+
+- **CI:** `ruff check` and `pytest` (with coverage gate) on all pull requests and pushes.
+- **Deploy:** on pushes to `main` only — build the Docker image, push to Amazon ECR as `:latest` and as a tag equal to the commit SHA, copy `docker-compose.prod.yml` to the instance, then SSH in to `docker compose pull` / `up` the `api` service.
+
+### Repository secrets (deploy)
+
+| Secret | Purpose |
+|--------|---------|
+| `AWS_ACCESS_KEY_ID` | IAM user used by Actions to push images to ECR |
+| `AWS_SECRET_ACCESS_KEY` | Pair for the above |
+| `AWS_REGION` | Region of the ECR repository (for example `us-east-1`) |
+| `ECR_REPOSITORY` | ECR repository name only (not the full URI) |
+| `EC2_HOST` | Public hostname or IP of the instance |
+| `EC2_USER` | SSH user (for example `ubuntu` or `ec2-user`) |
+| `EC2_SSH_PRIVATE_KEY` | PEM private key for that user |
+| `EC2_DEPLOY_DIR` | Optional. Directory on the instance for `docker-compose.prod.yml` (defaults to `/opt/email-tracker` if unset) |
+
+The EC2 instance needs the AWS CLI, Docker with Compose v2, and an **instance IAM role** (or equivalent) that allows `ecr:GetAuthorizationToken` and read/pull on your repository so `docker compose pull` succeeds. Host configuration (for example `/etc/tracker.env` and PostgreSQL on the host) stays on the server as described for production in `PLAN.md`.
 
 ## Docker Local Development
 
