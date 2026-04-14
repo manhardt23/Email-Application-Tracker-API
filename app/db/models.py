@@ -107,7 +107,9 @@ class WorkerRun(Base):
     __table_args__ = (
         Index(
             "uq_worker_runs_single_active",
-            literal_column("1"),
+            # PostgreSQL requires an expression index on a constant to use
+            # double-parens syntax: ON worker_runs ((1)) WHERE ...
+            literal_column("(1)"),
             unique=True,
             sqlite_where=text("status IN ('queued', 'running')"),
             postgresql_where=text("status IN ('queued', 'running')"),

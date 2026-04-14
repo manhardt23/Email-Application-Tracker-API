@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: job_tracker
+      POSTGRES_USER: job_tracker_user
+      POSTGRES_PASSWORD: job_tracker_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U job_tracker_user -d job_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://job_tracker_user:job_tracker_pass@db:5432/job_tracker
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://job_tracker_user:job_tracker_pass@db:5432/job_tracker
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m app.worker
+    profiles: ["worker"]
+
+volumes:
+  pgdata:

@@ -164,6 +164,50 @@ pytest --cov=app --cov-report=term
 The `≥70%` gate is enforced via `addopts` in `pyproject.toml` and will be wired into CI in Phase 9.  
 Current baseline: **≥83%** line coverage.
 
+## Docker Local Development
+
+### 1) Prepare env
+
+```bash
+cp .env.example .env
+```
+
+Set real values for `EMAIL_USER`, `EMAIL_PASS`, and `GROQ_API_KEY`.
+
+### 2) Build and start API + Postgres
+
+```bash
+docker compose up --build -d db api
+```
+
+API docs:
+- `http://127.0.0.1:8000/docs`
+- `http://127.0.0.1:8000/redoc`
+
+### 3) Apply SQL migrations (existing DB only)
+
+Fresh local Docker volumes auto-create tables from models at API startup.  
+Run migrations only if attaching to an existing DB.
+
+```powershell
+Get-Content "migrations/001_worker_run_queue_timestamps.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
+Get-Content "migrations/002_worker_run_last_processed_uid.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
+```
+
+### 4) Run worker one-shot
+
+```bash
+docker compose run --rm --profile worker worker
+```
+
+### 5) Useful commands
+
+```bash
+docker compose logs -f api
+docker compose down
+docker compose down -v
+```
+
 ## Local Development (Target Workflow)
 
 1. Create a virtual environment and install dependencies.
