@@ -105,10 +105,14 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
         def __init__(self) -> None:
             self.id = 1
             self.status = "queued"
+            self.last_processed_uid = 0
 
     class _FakeWorkerRunRepository:
         def __init__(self, session):  # noqa: ANN001
             self._run = _FakeWorkerRun()
+
+        def get_latest_run(self):  # noqa: ANN001
+            return self._run
 
         def reconcile_stale_worker_runs(self, max_age_minutes=1440) -> None:
             return None
@@ -186,7 +190,7 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
             ]
             self.application_emails = self.email_list
 
-        def fetch_emails(self, limit):  # noqa: ANN001
+        def fetch_emails(self, limit, since_uid=1):  # noqa: ANN001
             return self.email_list
 
         def analyze_emails(self):
@@ -350,10 +354,14 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def __init__(self) -> None:
             self.id = 1
             self.status = "queued"
+            self.last_processed_uid = 0
 
     class _FakeWorkerRunRepository:
         def __init__(self, session):  # noqa: ANN001
             self._run = _FakeWorkerRun()
+
+        def get_latest_run(self):  # noqa: ANN001
+            return self._run
 
         def reconcile_stale_worker_runs(self, max_age_minutes=1440) -> None:
             return None
@@ -443,7 +451,7 @@ def test_worker_processes_new_email_successfully(monkeypatch):
             self.email_list = [email]
             self.application_emails = self.email_list
 
-        def fetch_emails(self, limit):  # noqa: ANN001
+        def fetch_emails(self, limit, since_uid=1):  # noqa: ANN001
             return self.email_list
 
         def analyze_emails(self):
@@ -500,10 +508,14 @@ def test_worker_handles_zero_application_emails(monkeypatch, caplog):
         def __init__(self) -> None:
             self.id = 1
             self.status = "queued"
+            self.last_processed_uid = 0
 
     class _FakeWorkerRunRepository:
         def __init__(self, session):  # noqa: ANN001
             self._run = _FakeWorkerRun()
+
+        def get_latest_run(self):  # noqa: ANN001
+            return self._run
 
         def reconcile_stale_worker_runs(self, max_age_minutes=1440) -> None:
             return None
@@ -539,7 +551,7 @@ def test_worker_handles_zero_application_emails(monkeypatch, caplog):
             self.email_list = []
             self.application_emails = []
 
-        def fetch_emails(self, limit):  # noqa: ANN001
+        def fetch_emails(self, limit, since_uid=1):  # noqa: ANN001
             return self.email_list
 
         def analyze_emails(self):

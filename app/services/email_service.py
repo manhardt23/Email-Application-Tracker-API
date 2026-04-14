@@ -89,8 +89,8 @@ class EmailProcessor:
         self.email_list: list[EmailData] = []
         self.application_emails: list[EmailData] = []
 
-    def fetch_emails(self, limit: int) -> list[EmailData]:
-        raw_emails = fetch_recent_emails(limit)
+    def fetch_emails(self, limit: int, since_uid: int = 1) -> list[EmailData]:
+        raw_emails = fetch_recent_emails(limit, since_uid=since_uid)
         self.email_list = [
             EmailData(
                 message_id=raw.get("message_id"),

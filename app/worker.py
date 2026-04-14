@@ -94,11 +94,20 @@ def run(worker_run_id: int | None = None) -> int:
 
     session = SessionLocal()
     worker_run = None
+    run_id: int | None = None
     run_repo = WorkerRunRepository(session)
     processor = None
     try:
         run_repo.reconcile_stale_worker_runs(max_age_minutes=settings.stale_run_ttl_minutes)
         session.commit()
+        latest_run = run_repo.get_latest_run()
+        last_processed_uid = (
+            latest_run.last_processed_uid
+            if latest_run is not None and latest_run.last_processed_uid is not None
+            else 0
+        )
+        since_uid = last_processed_uid + 1
+        highest_uid = last_processed_uid
 
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)
@@ -130,11 +139,16 @@ def run(worker_run_id: int | None = None) -> int:
         run_id = worker_run.id
         # Prefer the higher of the two caps so MAX_EMAILS_PER_RUN is not capped by legacy EMAIL_LIMIT.
         effective_limit = max(settings.max_emails_per_run, settings.email_limit)
-        logger.info("run_id=%s fetching up to %d emails", worker_run.id, effective_limit)
+        logger.info(
+            "run_id=%s fetching up to %d emails since_uid=%d",
+            worker_run.id,
+            effective_limit,
+            since_uid,
+        )
 
         classifier = build_classifier(settings)
         processor = EmailProcessor(classifier)
-        processor.fetch_emails(effective_limit)
+        processor.fetch_emails(effective_limit, since_uid=since_uid)
         processor.analyze_emails()
 
         email_repo = EmailRepository(session)
@@ -146,6 +160,11 @@ def run(worker_run_id: int | None = None) -> int:
         model_name = getattr(classifier, "model_name", "unknown")
 
         for email_data in processor.email_list:
+            try:
+                highest_uid = max(highest_uid, int(email_data.uid))
+            except (TypeError, ValueError):
+                logger.warning("run_id=%s invalid UID value=%r", run_id, email_data.uid)
+
             if email_repo.exists(email_data.message_id, email_data.uid):
                 logger.debug(
                     "run_id=%s duplicate email — skipping: %s",
@@ -205,12 +224,13 @@ def run(worker_run_id: int | None = None) -> int:
 
         emails_fetched = len(processor.email_list)
         applications_found = len(processor.application_emails)
+        worker_run.last_processed_uid = highest_uid
         run_repo.complete(worker_run, emails_fetched, applications_found, saved)
         session.commit()
 
     except Exception as exc:
         if worker_run is not None:
-            wid = worker_run.id
+            wid = run_id if run_id is not None else worker_run.id
             try:
                 session.rollback()
                 wr = run_repo.get_by_id(wid)
@@ -230,7 +250,7 @@ def run(worker_run_id: int | None = None) -> int:
 
     logger.info(
         "run_id=%s completed — fetched=%s applications=%s saved=%s high_conf=%s needs_review=%s",
-        worker_run.id,
+        run_id,
         emails_fetched,
         applications_found,
         saved,

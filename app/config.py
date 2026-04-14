@@ -19,9 +19,9 @@ class Settings(BaseSettings):
 
     # Worker knobs — tunable via env without code changes.
     # EMAIL_LIMIT is preserved for backward-compat; MAX_EMAILS_PER_RUN is preferred.
-    email_limit: int = 10
+    email_limit: int = 5
     imap_timeout_seconds: int = 30
-    max_emails_per_run: int = 50
+    max_emails_per_run: int = 10
     stale_run_ttl_minutes: int = 1440  # 24 hours
 
     # Database

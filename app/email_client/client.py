@@ -39,7 +39,7 @@ def _connect_to_inbox(timeout: int | None = None):
     return mail
 
 
-def fetch_recent_emails(limit: int) -> list[dict]:
+def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
     """Fetch up to *limit* most-recent emails from the inbox.
 
     Retries the connect+search phase once on transient network errors. Per-message
@@ -51,7 +51,8 @@ def fetch_recent_emails(limit: int) -> list[dict]:
     for attempt in range(1, _CONNECT_MAX_ATTEMPTS + 1):
         try:
             mail = _connect_to_inbox()
-            status, data = mail.uid("search", None, "ALL")
+            start_uid = max(1, since_uid)
+            status, data = mail.uid("search", None, f"UID {start_uid}:*")
             if status != "OK":
                 _close_mail(mail)
                 mail = None
@@ -87,8 +88,13 @@ def fetch_recent_emails(limit: int) -> list[dict]:
             return []
 
         mail_uids = data[0].split()
-        recent_uids = mail_uids[-limit:] if len(mail_uids) > limit else mail_uids
-        logger.debug("IMAP search returned %d UIDs; processing last %d", len(mail_uids), len(recent_uids))
+        recent_uids = mail_uids[:limit] if len(mail_uids) > limit else mail_uids
+        logger.debug(
+            "IMAP search returned %d UIDs from start_uid=%d; processing %d",
+            len(mail_uids),
+            start_uid,
+            len(recent_uids),
+        )
 
         results = []
         for uid in recent_uids:

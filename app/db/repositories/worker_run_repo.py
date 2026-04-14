@@ -11,6 +11,13 @@ STALE_WORKER_RUN_MINUTES = 24 * 60
 
 
 class WorkerRunRepository(BaseRepository):
+    def get_latest_run(self) -> WorkerRun | None:
+        return (
+            self.session.query(WorkerRun)
+            .order_by(WorkerRun.queued_at.desc(), WorkerRun.id.desc())
+            .first()
+        )
+
     def reconcile_stale_worker_runs(self, max_age_minutes: int = STALE_WORKER_RUN_MINUTES) -> None:
         """Mark queued/running rows older than max_age_minutes as failed so new jobs can enqueue."""
         threshold = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)

@@ -115,6 +115,7 @@ class WorkerRun(Base):
     )
 
     id = Column(Integer, primary_key=True)
+    last_processed_uid = Column(Integer, nullable=True)
     queued_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
