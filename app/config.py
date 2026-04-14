@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     database_url: str
 
     # LLM — set to "groq" for production, "ollama" for local dev
-    llm_provider: str = "ollama"
+    llm_provider: str = "groq"
     groq_api_key: str | None = None
 
     @field_validator("imap_timeout_seconds")

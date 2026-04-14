@@ -46,7 +46,7 @@ class GroqAdapter:
     def __init__(
         self,
         api_key: str | None,
-        model: str = "llama-3.1-8b-instant",
+        model: str = "llama-3.3-70b-versatile",
     ) -> None:
         try:
             from groq import Groq
