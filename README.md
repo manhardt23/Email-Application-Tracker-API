@@ -175,7 +175,8 @@ Workflow: `.github/workflows/ci.yml`.
 
 | Secret | Purpose |
 |--------|---------|
-| `AWS_ROLE_TO_ASSUME` | IAM role ARN assumed by GitHub OIDC for ECR push |
+| `AWS_ACCESS_KEY_ID` | IAM user access key for ECR push |
+| `AWS_SECRET_ACCESS_KEY` | Secret key paired with `AWS_ACCESS_KEY_ID` |
 | `AWS_REGION` | Region of the ECR repository (for example `us-east-1`) |
 | `ECR_REPOSITORY` | ECR repository name only (not the full URI) |
 | `EC2_HOST` | Public hostname or IP of the instance |
