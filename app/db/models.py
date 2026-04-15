@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -29,7 +29,7 @@ class Company(Base):
     name = Column(String(255), unique=True, nullable=False, index=True)
     domain = Column(String(255))
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
     applications = relationship(
@@ -50,12 +50,12 @@ class Application(Base):
     position = Column(String(500), nullable=False)
     stage = Column(String(50), default="applied", nullable=False)
     applied_date = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
     last_updated = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
     notes = Column(Text)
@@ -86,7 +86,7 @@ class Email(Base):
     received_date = Column(DateTime(timezone=True), nullable=False, index=True)
     body = Column(Text)
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
     analysis = relationship(
@@ -120,7 +120,7 @@ class WorkerRun(Base):
     last_processed_uid = Column(Integer, nullable=True)
     queued_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
     )
     started_at = Column(DateTime(timezone=True), nullable=True)
@@ -152,7 +152,7 @@ class EmailAnalysis(Base):
     needs_review = Column(Boolean, default=False, nullable=False, index=True)
     model_used = Column(String(100))
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
     email = relationship("Email", back_populates="analysis")

@@ -77,7 +77,10 @@ def quick_filter(sender: str, subject: str, email_content: str) -> bool:
                     re.search(p, text) for p in _APPLICATION_CONFIRMATION_PATTERNS
                 )
                 if not has_confirmation:
-                    print(f"Quick filter: job board email from {sender_domain} without confirmation language")
+                    print(
+                        "Quick filter: job board email from "
+                        f"{sender_domain} without confirmation language"
+                    )
                     return False
                 break
 
