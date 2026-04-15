@@ -34,4 +34,4 @@ volumes:
 
 secrets:
   postgres_password:
-    file: /etc/tracker-postgres-password
+    file: /home/ubuntu/Email-Application-Tracker-API/.env
