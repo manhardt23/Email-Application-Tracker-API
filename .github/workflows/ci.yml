@@ -106,10 +106,43 @@ jobs:
           envs: ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,DEPLOY_DIR
           script: |
             set -euo pipefail
+            #region agent log
+            debug_log() {
+              local hypothesis_id="$1"
+              local message="$2"
+              local data_json="$3"
+              curl -sS -X POST 'http://127.0.0.1:7923/ingest/78abdaf3-fc2e-427a-958d-6cd5bd8c946b' \
+                -H 'Content-Type: application/json' \
+                -H 'X-Debug-Session-Id: 41fc9b' \
+                -d "{\"sessionId\":\"41fc9b\",\"runId\":\"pre-fix\",\"hypothesisId\":\"${hypothesis_id}\",\"location\":\".github/workflows/ci.yml:deploy-ssh-script\",\"message\":\"${message}\",\"data\":${data_json},\"timestamp\":$(date +%s000)}" \
+                >/dev/null 2>&1 || true
+            }
+            #endregion
             sudo mkdir -p "$DEPLOY_DIR"
             sudo install -m 644 /tmp/email-tracker-deploy/docker-compose.prod.yml "$DEPLOY_DIR/docker-compose.prod.yml"
             TRACKER_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+            #region agent log
+            echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 message='compose config preflight with TRACKER_IMAGE only'"
+            if sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" config >/tmp/agent_compose_config.out 2>/tmp/agent_compose_config.err; then
+              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 preflight_status=success"
+            else
+              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 preflight_status=failed"
+              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 stderr_begin"
+              sudo sed -n '1,20p' /tmp/agent_compose_config.err
+              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 stderr_end"
+            fi
+            #endregion
+            #region agent log
+            debug_log "H1" "resolved core deploy vars" "{\"deployDir\":\"$DEPLOY_DIR\",\"imageTag\":\"$IMAGE_TAG\",\"hasEcrRegistry\":$([ -n "${ECR_REGISTRY:-}" ] && echo true || echo false),\"hasEcrRepository\":$([ -n "${ECR_REPOSITORY:-}" ] && echo true || echo false),\"hasTrackerImage\":$([ -n "${TRACKER_IMAGE:-}" ] && echo true || echo false)}"
+            debug_log "H2" "compose file present before compose commands" "{\"composePath\":\"$DEPLOY_DIR/docker-compose.prod.yml\",\"composeExists\":$([ -f "$DEPLOY_DIR/docker-compose.prod.yml" ] && echo true || echo false)}"
+            #endregion
             aws ecr get-login-password --region "$AWS_REGION" | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
-            sudo docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" down --remove-orphans
+            #region agent log
+            debug_log "H3" "about to run compose down without TRACKER_IMAGE export" "{\"command\":\"docker compose down --remove-orphans\",\"usesTrackerImageInEnv\":false}"
+            #endregion
+            sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" down --remove-orphans
+            #region agent log
+            debug_log "H4" "compose down completed" "{\"command\":\"docker compose down --remove-orphans\",\"status\":\"success\"}"
+            #endregion
             sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" pull api
             sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" up -d --remove-orphans api
