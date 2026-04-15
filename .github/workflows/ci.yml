@@ -110,5 +110,6 @@ jobs:
             sudo install -m 644 /tmp/email-tracker-deploy/docker-compose.prod.yml "$DEPLOY_DIR/docker-compose.prod.yml"
             TRACKER_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
             aws ecr get-login-password --region "$AWS_REGION" | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
+            sudo docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" down --remove-orphans
             sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" pull api
             sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" up -d --remove-orphans api
