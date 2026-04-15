@@ -27,7 +27,7 @@ EXIT_PIPELINE    (1)  — unexpected pipeline failure; WorkerRun row marked 'fai
 """
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.config import get_settings
 from app.db import models
@@ -137,7 +137,8 @@ def run(worker_run_id: int | None = None) -> int:
             logger.info("Created and claimed cron/manual WorkerRun id=%s", worker_run.id)
 
         run_id = worker_run.id
-        # Prefer the higher of the two caps so MAX_EMAILS_PER_RUN is not capped by legacy EMAIL_LIMIT.
+        # Prefer the higher of the two caps so MAX_EMAILS_PER_RUN
+        # is not capped by legacy EMAIL_LIMIT.
         effective_limit = max(settings.max_emails_per_run, settings.email_limit)
         logger.info(
             "run_id=%s fetching up to %d emails since_uid=%d",
@@ -173,7 +174,7 @@ def run(worker_run_id: int | None = None) -> int:
                 )
                 continue
 
-            received = email_data.date or datetime.now(timezone.utc)
+            received = email_data.date or datetime.now(UTC)
             if email_data.date is None:
                 mid = email_data.message_id or "(no Message-ID)"
                 logger.warning(

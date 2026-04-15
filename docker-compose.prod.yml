@@ -1,0 +1,37 @@
+# EC2 production API — image is set at deploy time (ECR URI + tag).
+# Expects host env file at /etc/tracker.env (DATABASE_URL, email, LLM keys, etc.).
+# IMPORTANT: DATABASE_URL in /etc/tracker.env must use `db`, not `localhost`.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: "${TRACKER_IMAGE}"
+    ports:
+      - "8000:8000"
+    env_file:
+      - /etc/tracker.env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+secrets:
+  postgres_password:
+    file: /etc/tracker-postgres-password

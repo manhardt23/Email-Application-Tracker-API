@@ -3,11 +3,11 @@
 ## Stack
 
 - **API:** Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic
-- **Database:** PostgreSQL on EC2 host (no RDS)
+- **Database:** PostgreSQL via Docker Compose `db` service on EC2 (no RDS)
 - **LLM:** Groq free tier (`llama-3.1-8b-instant`) in prod; Ollama for local dev; `quick_filter` pre-screen to minimize API calls
 - **Email Parsing:** BeautifulSoup structured HTML extraction (Phase 3)
 - **Scheduler:** System crontab on EC2 triggers `app/worker.py` as a Docker container at peak hours — decoupled from API
-- **Infrastructure:** EC2 (t2.micro/t3.micro) + PostgreSQL on host + Docker + ECR
+- **Infrastructure:** EC2 (t2.micro/t3.micro) + Docker Compose (`api` + `db`) + ECR
 - **CI/CD:** GitHub Actions → ECR push → SSH deploy on merge to `main`
 
 ## Cost (~$9-10/month)
@@ -22,8 +22,8 @@
 
 ```
 EC2 Instance
-├── PostgreSQL (host OS, data on EBS)
-├── API Container (Docker, systemd-managed, :8000)
+├── PostgreSQL Container (`db`, data on EBS-backed Docker volume)
+├── API Container (`api`, Docker Compose, :8000)
 └── Worker Container (Docker, triggered by crontab at peak hours, exits after run)
 ```
 
@@ -67,10 +67,10 @@ app/
 | 4 | **LLM → Groq** ✅ | Groq adapter, Protocol abstraction, Ollama for local dev |
 | 5 | **API Cleanup** ✅ | Full `/api/v1/` endpoints, DB-backed job status |
 | 6 | **Worker Entrypoint** ✅ | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
-| 7 | **Tests** 🚧 | pytest unit + integration, **≥70%** line coverage, CI-ready test commands |
-| 8 | **Docker** | Multi-stage Dockerfile, docker-compose for local dev |
-| 9 | **CI/CD** | GitHub Actions: test on PR, build+deploy on merge |
-| 10 | **AWS Deployment** | EC2 + PostgreSQL + systemd + crontab + Secrets Manager |
+| 7 | **Tests** ✅ | pytest unit + integration, **≥70%** line coverage, CI-ready test commands |
+| 8 | **Docker** ✅ | Multi-stage Dockerfile, docker-compose for local dev |
+| 9 | **CI/CD** ✅ | GitHub Actions: test on PR/push, ECR image push + SSH deploy on `main` |
+| 10 | **AWS Deployment** | EC2 + Docker Compose (`api` + `db`) + crontab + Secrets Manager |
 
 ## Key Notes
 

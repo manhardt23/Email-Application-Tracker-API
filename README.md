@@ -25,16 +25,16 @@ Current source-of-truth plan: `PLAN.md`
 | 5 | API Cleanup | Complete | Final `/api/v1/` endpoint surface + job status |
 | 6 | Worker Entrypoint | Complete | `python -m app.worker`: exit codes, logging, IMAP retries, worker env config, tests + README operator docs |
 | 7 | Tests | Complete | pytest unit + integration, 83% line coverage, ≥70% gate in pyproject.toml |
-| 8 | Docker | Planned | Multi-stage image + compose setup |
-| 9 | CI/CD | Planned | GitHub Actions test/build/deploy flow |
-| 10 | AWS Deployment | Planned | EC2 deployment with host PostgreSQL + cron scheduling |
+| 8 | Docker | Complete | Multi-stage image + compose setup |
+| 9 | CI/CD | Complete | GitHub Actions: test on PR/push, ECR + EC2 deploy on `main` |
+| 10 | AWS Deployment | Planned | EC2 deployment with Docker Compose (`api` + `db`) + cron scheduling |
 
 ## Planned Architecture
 
 ```text
 EC2 Instance
-|- PostgreSQL (host OS, EBS-backed)
-|- API container (Docker, systemd-managed)
+|- Docker Compose `db` container (PostgreSQL, EBS-backed volume)
+|- Docker Compose `api` container
 `- Worker container (cron-triggered batch runs)
 ```
 
@@ -45,7 +45,7 @@ The worker is intentionally decoupled from API request/response flow and runs on
 - Python 3.12
 - FastAPI
 - SQLAlchemy 2.x + Alembic
-- PostgreSQL (on EC2 host)
+- PostgreSQL (Docker Compose `db` service on EC2)
 - IMAP + BeautifulSoup (email parsing)
 - LLM provider abstraction:
   - Groq (`llama-3.1-8b-instant`) for production
@@ -161,8 +161,47 @@ pytest -m "not integration"
 pytest --cov=app --cov-report=term
 ```
 
-The `≥70%` gate is enforced via `addopts` in `pyproject.toml` and will be wired into CI in Phase 9.  
+The `≥70%` gate is enforced via `addopts` in `pyproject.toml` and in GitHub Actions on every PR and push.  
 Current baseline: **≥83%** line coverage.
+
+## CI/CD (GitHub Actions)
+
+Workflow: `.github/workflows/ci.yml`.
+
+- **CI:** `ruff check` and `pytest` (with coverage gate) on all pull requests and pushes.
+- **Deploy:** on pushes to `main` only — build the Docker image, push to Amazon ECR as `:latest` and as a tag equal to the commit SHA, copy `docker-compose.prod.yml` to the instance, then SSH in to `docker compose pull` / `up` the `api` service.
+
+### Repository secrets (deploy)
+
+| Secret | Purpose |
+|--------|---------|
+| `AWS_ROLE_TO_ASSUME` | IAM role ARN assumed by GitHub OIDC for ECR push |
+| `AWS_REGION` | Region of the ECR repository (for example `us-east-1`) |
+| `ECR_REPOSITORY` | ECR repository name only (not the full URI) |
+| `EC2_HOST` | Public hostname or IP of the instance |
+| `EC2_USER` | SSH user (for example `ubuntu` or `ec2-user`) |
+| `EC2_SSH_PRIVATE_KEY` | PEM private key for that user |
+| `EC2_DEPLOY_DIR` | Optional. Directory on the instance for `docker-compose.prod.yml` (defaults to `/opt/email-tracker` if unset) |
+
+The EC2 instance needs AWS CLI, Docker with Compose v2, and an instance IAM role (or equivalent) that allows `ecr:GetAuthorizationToken` plus read/pull on your repository so `docker compose pull` succeeds.
+
+### Production host configuration
+
+Keep these files only on the server (not in git):
+
+- `/etc/tracker.env` (consumed by the `api` service), including:
+  - `DATABASE_URL=postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@db:5432/<POSTGRES_DB>`
+  - app/runtime env vars (`EMAIL_USER`, `EMAIL_PASS`, `LLM_PROVIDER`, `GROQ_API_KEY`, etc.)
+  - `POSTGRES_DB=<db_name>`
+  - `POSTGRES_USER=<db_user>`
+- `/etc/tracker-postgres-password` (single line password used by Docker secret `postgres_password`)
+
+Create the password file with strict permissions (example):
+
+```bash
+sudo sh -c 'printf "%s" "<strong-password>" > /etc/tracker-postgres-password'
+sudo chmod 600 /etc/tracker-postgres-password
+```
 
 ## Docker Local Development
 

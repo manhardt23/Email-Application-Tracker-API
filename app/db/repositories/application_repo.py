@@ -1,5 +1,7 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from sqlalchemy import func
+
 from app.db.models import Application
 from app.db.repositories.base import BaseRepository
 
@@ -38,10 +40,10 @@ class ApplicationRepository(BaseRepository):
         if not new_stage or date is None:
             return
         date_naive = (
-            date.astimezone(timezone.utc).replace(tzinfo=None) if date.tzinfo else date
+            date.astimezone(UTC).replace(tzinfo=None) if date.tzinfo else date
         )
         last_updated_naive = (
-            application.last_updated.astimezone(timezone.utc).replace(tzinfo=None)
+            application.last_updated.astimezone(UTC).replace(tzinfo=None)
             if application.last_updated.tzinfo
             else application.last_updated
         )

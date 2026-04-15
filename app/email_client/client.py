@@ -45,7 +45,6 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
     Retries the connect+search phase once on transient network errors. Per-message
     fetch errors are logged and skipped without aborting the whole run (no log spam).
     """
-    last_exc: Exception | None = None
     mail = None
 
     for attempt in range(1, _CONNECT_MAX_ATTEMPTS + 1):
@@ -59,7 +58,6 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
                 raise RuntimeError(f"IMAP search failed: {status}")
             break
         except _TRANSIENT_IMAP_ERRORS as exc:
-            last_exc = exc
             _close_mail(mail)
             mail = None
             if attempt < _CONNECT_MAX_ATTEMPTS:
@@ -113,7 +111,10 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
                     message_id = _optional_str(msg.get("Message-ID"))
                     if not message_id:
                         uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                        logger.warning("Skipping uid=%s: missing required Message-ID header", uid_str)
+                        logger.warning(
+                            "Skipping uid=%s: missing required Message-ID header",
+                            uid_str,
+                        )
                         continue
 
                     email_date = None

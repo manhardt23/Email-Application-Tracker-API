@@ -1,4 +1,5 @@
 from sqlalchemy import func
+
 from app.db.models import Company
 from app.db.repositories.base import BaseRepository
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
@@ -20,7 +20,7 @@ class WorkerRunRepository(BaseRepository):
 
     def reconcile_stale_worker_runs(self, max_age_minutes: int = STALE_WORKER_RUN_MINUTES) -> None:
         """Mark queued/running rows older than max_age_minutes as failed so new jobs can enqueue."""
-        threshold = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)
+        threshold = datetime.now(UTC) - timedelta(minutes=max_age_minutes)
         stale = (
             self.session.query(WorkerRun)
             .filter(
@@ -38,7 +38,7 @@ class WorkerRunRepository(BaseRepository):
         msg = (
             f"Stale run auto-failed (exceeded {max_age_minutes} minutes in queued/running state)."
         )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for run in stale:
             run.status = "failed"
             run.finished_at = now
@@ -57,8 +57,11 @@ class WorkerRunRepository(BaseRepository):
             return None
 
     def claim_if_queued(self, run_id: int) -> WorkerRun | None:
-        """Transition run_id from queued to running and set started_at. Returns None if not queued."""
-        now = datetime.now(timezone.utc)
+        """Transition run_id from queued to running and set started_at.
+
+        Returns None if the row is not queued.
+        """
+        now = datetime.now(UTC)
         updated = (
             self.session.query(WorkerRun)
             .filter(WorkerRun.id == run_id, WorkerRun.status == "queued")
@@ -78,14 +81,14 @@ class WorkerRunRepository(BaseRepository):
         applications_found: int,
         emails_saved: int,
     ) -> None:
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         run.status = "completed"
         run.emails_fetched = emails_fetched
         run.applications_found = applications_found
         run.emails_saved = emails_saved
 
     def fail(self, run: WorkerRun, error_message: str) -> None:
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         run.status = "failed"
         run.error_message = error_message
 

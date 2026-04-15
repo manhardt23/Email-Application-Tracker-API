@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,7 +22,7 @@ def get_db():
 DbDep = Annotated[Session, Depends(get_db)]
 
 
-class StageEnum(str, Enum):
+class StageEnum(StrEnum):
     applied = "applied"
     rejected = "rejected"
     interview = "interview"
