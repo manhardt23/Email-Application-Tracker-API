@@ -40,6 +40,7 @@ from app.db.repositories.worker_run_repo import WorkerRunRepository
 from app.llm.base import EmailClassification
 from app.llm.factory import build_classifier
 from app.services.email_service import EmailProcessor
+from app.services.worker_runtime import get_effective_max_emails
 
 # ---------------------------------------------------------------------------
 # Exit codes — documented in module docstring above.
@@ -137,9 +138,10 @@ def run(worker_run_id: int | None = None) -> int:
             logger.info("Created and claimed cron/manual WorkerRun id=%s", worker_run.id)
 
         run_id = worker_run.id
-        # Prefer the higher of the two caps so MAX_EMAILS_PER_RUN
-        # is not capped by legacy EMAIL_LIMIT.
-        effective_limit = max(settings.max_emails_per_run, settings.email_limit)
+        # Prefer the higher of the two config caps so MAX_EMAILS_PER_RUN
+        # is not capped by legacy EMAIL_LIMIT, then apply runtime override.
+        configured_limit = max(settings.max_emails_per_run, settings.email_limit)
+        effective_limit = get_effective_max_emails(configured_limit)
         logger.info(
             "run_id=%s fetching up to %d emails since_uid=%d",
             worker_run.id,

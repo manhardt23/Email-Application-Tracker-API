@@ -18,6 +18,7 @@ from app.api.v1 import emails as emails_module
 from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
 from app.db.models import Application, Base, Company, Email, EmailAnalysis, WorkerRun
+from app.services.worker_runtime import clear_max_emails_override, get_max_emails_override
 
 # ---------------------------------------------------------------------------
 # In-memory SQLite test DB + session factory
@@ -43,9 +44,11 @@ def override_get_db():
 
 @pytest.fixture(autouse=True)
 def fresh_db():
+    clear_max_emails_override()
     Base.metadata.create_all(bind=_engine)
     yield
     Base.metadata.drop_all(bind=_engine)
+    clear_max_emails_override()
 
 
 @pytest.fixture
@@ -308,3 +311,15 @@ def test_trigger_job_409_when_already_running(client, db):
 
     mock_run.assert_not_called()
     assert resp.status_code == 409
+
+
+def test_set_worker_email_limit_sets_in_memory_override(client):
+    resp = client.post("/api/v1/jobs/email-limit", json={"max_emails_per_run": 25})
+    assert resp.status_code == 200
+    assert resp.json() == {"max_emails_per_run": 25, "source": "in_memory_override"}
+    assert get_max_emails_override() == 25
+
+
+def test_set_worker_email_limit_rejects_out_of_range(client):
+    resp = client.post("/api/v1/jobs/email-limit", json={"max_emails_per_run": 1001})
+    assert resp.status_code == 422

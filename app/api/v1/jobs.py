@@ -2,10 +2,12 @@ import traceback
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.database import SessionLocal
 from app.db.repositories.worker_run_repo import WorkerRunRepository
+from app.services.worker_runtime import set_max_emails_override
 
 router = APIRouter()
 
@@ -19,6 +21,10 @@ def get_db():
 
 
 DbDep = Annotated[Session, Depends(get_db)]
+
+
+class WorkerEmailLimitUpdate(BaseModel):
+    max_emails_per_run: int = Field(..., ge=1, le=1000)
 
 
 def _run_worker(run_id: int) -> None:
@@ -42,6 +48,12 @@ def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep):
     run_id = run.id
     background_tasks.add_task(_run_worker, run_id)
     return {"job_id": str(run_id), "status": "queued"}
+
+
+@router.post("/email-limit")
+def set_worker_email_limit(body: WorkerEmailLimitUpdate):
+    override = set_max_emails_override(body.max_emails_per_run)
+    return {"max_emails_per_run": override, "source": "in_memory_override"}
 
 
 @router.get("/{job_id}")

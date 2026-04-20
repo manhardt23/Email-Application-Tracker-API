@@ -18,6 +18,11 @@ from app.worker import (
     _validate_config,
     run,
 )
+from app.services.worker_runtime import clear_max_emails_override, set_max_emails_override
+
+
+def setup_function():
+    clear_max_emails_override()
 
 # ---------------------------------------------------------------------------
 # _validate_config unit tests
@@ -208,3 +213,60 @@ def test_run_api_triggered_returns_exit_pipeline_when_run_not_found(mock_gs):
         result = run(worker_run_id=99)
 
     assert result == EXIT_PIPELINE
+
+
+@patch("app.worker.get_settings")
+def test_run_uses_runtime_email_limit_override(mock_gs):
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    infra["run_repo"].get_latest_run.return_value = None
+    set_max_emails_override(7)
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository"), \
+         patch("app.worker.CompanyRepository"), \
+         patch("app.worker.ApplicationRepository"), \
+         patch("app.worker.AnalysisRepository"), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run()
+
+    assert result == EXIT_OK
+    infra["processor"].fetch_emails.assert_called_once_with(7, since_uid=1)
+
+
+@patch("app.worker.get_settings")
+def test_api_email_limit_endpoint_flows_through_to_worker(mock_gs):
+    """End-to-end: POST /jobs/email-limit sets override, then run() uses it."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api.v1 import jobs as jobs_module
+    from app.api.v1.router import api_router
+
+    app = FastAPI()
+    app.include_router(api_router, prefix="/api/v1")
+    client = TestClient(app)
+
+    resp = client.post("/api/v1/jobs/email-limit", json={"max_emails_per_run": 15})
+    assert resp.status_code == 200
+    assert resp.json()["max_emails_per_run"] == 15
+
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    infra["run_repo"].get_latest_run.return_value = None
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository"), \
+         patch("app.worker.CompanyRepository"), \
+         patch("app.worker.ApplicationRepository"), \
+         patch("app.worker.AnalysisRepository"), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run()
+
+    assert result == EXIT_OK
+    infra["processor"].fetch_emails.assert_called_once_with(15, since_uid=1)

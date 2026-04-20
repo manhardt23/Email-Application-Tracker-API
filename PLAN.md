@@ -55,6 +55,7 @@ app/
 | GET | `/emails` | List processed emails |
 | GET | `/emails/review` | Emails needing review |
 | POST | `/jobs/email-check` | Manual trigger |
+| POST | `/jobs/email-limit` | Set in-memory worker email limit override (`1..1000`) |
 | GET | `/jobs/{job_id}` | Job status |
 
 ## Phases
@@ -226,3 +227,30 @@ app/
 ### Chunk 6 (verification)
 - Run full **`pytest`** + **`coverage report`** locally; fix lint on touched files
 - Incremental commits per completed chunk
+
+## Phase 11 Breakdown (manageable chunks)
+
+**Phase:** 11 — Runtime worker email limit override  
+**Already done:** Phases 1–9 complete, with worker using env defaults (`MAX_EMAILS_PER_RUN` and legacy `EMAIL_LIMIT`)  
+**This phase delivers:** A non-`PATCH` API endpoint to set a process-local in-memory override (`1..1000`) for worker email fetch count, used on subsequent in-process runs.
+
+### Chunk 1 (runtime override state)
+- Add a small worker runtime module with set/get/clear/effective helpers
+- Keep override in memory only (no DB migration, no env writeback)
+
+### Chunk 2 (API endpoint)
+- Add `POST /api/v1/jobs/email-limit`
+- Validate body range `1..1000`
+- Return applied value and source metadata
+
+### Chunk 3 (worker integration)
+- Apply override in `app/worker.py` after existing default resolution logic
+- Preserve fallback behavior when no override is set
+
+### Chunk 4 (tests)
+- API tests for happy path + out-of-range validation
+- Worker test proving runtime override is used for `fetch_emails()`
+
+### Chunk 5 (verification)
+- Run unit tests for touched phase5/phase6 test modules
+- Fix any lint issues introduced by this change
