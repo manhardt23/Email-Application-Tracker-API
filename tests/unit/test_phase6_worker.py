@@ -10,6 +10,7 @@ All DB and IMAP interactions are mocked. Tests focus on:
 """
 from unittest.mock import MagicMock, patch
 
+from app.services.worker_runtime import clear_max_emails_override, set_max_emails_override
 from app.worker import (
     EXIT_CONFIG,
     EXIT_NO_SLOT,
@@ -18,7 +19,6 @@ from app.worker import (
     _validate_config,
     run,
 )
-from app.services.worker_runtime import clear_max_emails_override, set_max_emails_override
 
 
 def setup_function():
@@ -242,7 +242,7 @@ def test_api_email_limit_endpoint_flows_through_to_worker(mock_gs):
     """End-to-end: POST /jobs/email-limit sets override, then run() uses it."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-    from app.api.v1 import jobs as jobs_module
+
     from app.api.v1.router import api_router
 
     app = FastAPI()
