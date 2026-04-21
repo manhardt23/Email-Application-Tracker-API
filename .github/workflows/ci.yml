@@ -101,6 +101,11 @@ jobs:
             TRACKER_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
             cd ~/deploy
             test -f .env
+            if grep -q '^TRACKER_IMAGE=' .env; then
+              sed -i "s|^TRACKER_IMAGE=.*|TRACKER_IMAGE=$TRACKER_IMAGE|" .env
+            else
+              printf '\nTRACKER_IMAGE=%s\n' "$TRACKER_IMAGE" >> .env
+            fi
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml pull
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans
