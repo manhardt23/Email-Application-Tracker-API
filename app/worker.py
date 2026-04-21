@@ -27,7 +27,7 @@ EXIT_PIPELINE    (1)  — unexpected pipeline failure; WorkerRun row marked 'fai
 """
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.config import get_settings
 from app.db import models
@@ -37,6 +37,7 @@ from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.db.repositories.email_repo import EmailRepository
 from app.db.repositories.worker_run_repo import WorkerRunRepository
+from app.email_client.client import get_latest_uid, get_uid_received_date
 from app.llm.base import EmailClassification
 from app.llm.factory import build_classifier
 from app.services.email_service import EmailProcessor
@@ -49,8 +50,69 @@ EXIT_OK = 0
 EXIT_PIPELINE = 1
 EXIT_NO_SLOT = 2
 EXIT_CONFIG = 3
+UID_STALE_DAYS = 30
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_uid_cursor(last_processed_uid: int, imap_timeout_seconds: int) -> int:
+    """Reset tracked UID to mailbox head when the tracked email is stale/missing."""
+    if last_processed_uid <= 0:
+        return 0
+
+    tracked_email_date = get_uid_received_date(last_processed_uid, timeout=imap_timeout_seconds)
+    latest_uid: int | None = None
+
+    if tracked_email_date is None:
+        latest_uid = get_latest_uid(timeout=imap_timeout_seconds)
+        if latest_uid is not None:
+            logger.info(
+                (
+                    "UID cursor reset: tracked uid=%d not found/date unavailable; "
+                    "jumping to latest uid=%d"
+                ),
+                last_processed_uid,
+                latest_uid,
+            )
+            return latest_uid
+        logger.warning(
+            (
+                "UID cursor check skipped: tracked uid=%d date unavailable and "
+                "latest uid could not be determined"
+            ),
+            last_processed_uid,
+        )
+        return last_processed_uid
+
+    tracked_email_date_utc = (
+        tracked_email_date.replace(tzinfo=UTC)
+        if tracked_email_date.tzinfo is None
+        else tracked_email_date.astimezone(UTC)
+    )
+    stale_threshold = datetime.now(UTC) - timedelta(days=UID_STALE_DAYS)
+    if tracked_email_date_utc >= stale_threshold:
+        return last_processed_uid
+
+    latest_uid = get_latest_uid(timeout=imap_timeout_seconds)
+    if latest_uid is not None:
+        logger.info(
+            (
+                "UID cursor reset: tracked uid=%d email_date=%s older than %d days; "
+                "jumping to latest uid=%d"
+            ),
+            last_processed_uid,
+            tracked_email_date_utc.isoformat(),
+            UID_STALE_DAYS,
+            latest_uid,
+        )
+        return latest_uid
+
+    logger.warning(
+        "UID cursor stale: tracked uid=%d email_date=%s but latest uid unavailable; keeping cursor",
+        last_processed_uid,
+        tracked_email_date_utc.isoformat(),
+    )
+    return last_processed_uid
 
 
 def _validate_config(settings) -> str | None:
@@ -107,8 +169,9 @@ def run(worker_run_id: int | None = None) -> int:
             if latest_run is not None and latest_run.last_processed_uid is not None
             else 0
         )
-        since_uid = last_processed_uid + 1
-        highest_uid = last_processed_uid
+        cursor_uid = _resolve_uid_cursor(last_processed_uid, settings.imap_timeout_seconds)
+        since_uid = cursor_uid + 1
+        highest_uid = cursor_uid
 
         if worker_run_id is not None:
             worker_run = run_repo.get_by_id(worker_run_id)

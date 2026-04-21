@@ -4,6 +4,7 @@ import logging
 import re
 import socket
 import time
+from datetime import UTC, datetime
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -86,7 +87,11 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
             return []
 
         mail_uids = data[0].split()
-        recent_uids = mail_uids[:limit] if len(mail_uids) > limit else mail_uids
+        recent_uids = (
+            list(reversed(mail_uids[-limit:]))
+            if len(mail_uids) > limit
+            else list(reversed(mail_uids))
+        )
         logger.debug(
             "IMAP search returned %d UIDs from start_uid=%d; processing %d",
             len(mail_uids),
@@ -149,6 +154,44 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
                 continue
 
         return results
+    finally:
+        _close_mail(mail)
+
+
+def get_uid_received_date(uid: int, timeout: int | None = None) -> datetime | None:
+    """Return the Date header timestamp for a specific UID."""
+    mail = _connect_to_inbox(timeout=timeout)
+    try:
+        status, msg_data = mail.uid("fetch", str(uid), "(BODY.PEEK[HEADER.FIELDS (DATE)])")
+        if status != "OK" or not msg_data:
+            return None
+
+        for part in msg_data:
+            if not isinstance(part, tuple):
+                continue
+            msg = email.message_from_bytes(part[1])
+            date_str = msg.get("Date")
+            if not date_str:
+                continue
+            parsed = parsedate_to_datetime(date_str)
+            return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+        return None
+    finally:
+        _close_mail(mail)
+
+
+def get_latest_uid(timeout: int | None = None) -> int | None:
+    """Return the newest UID currently available in the inbox."""
+    mail = _connect_to_inbox(timeout=timeout)
+    try:
+        status, data = mail.uid("search", None, "UID 1:*")
+        if status != "OK" or not data or not data[0]:
+            return None
+        raw_uid = data[0].split()[-1]
+        return int(raw_uid.decode() if isinstance(raw_uid, bytes) else raw_uid)
+    except ValueError:
+        logger.warning("Could not parse latest inbox UID")
+        return None
     finally:
         _close_mail(mail)
 

@@ -8,6 +8,7 @@ All DB and IMAP interactions are mocked. Tests focus on:
 - run() returns EXIT_OK on a clean (empty) pipeline run
 - run() returns EXIT_PIPELINE on unexpected exception and marks run failed
 """
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from app.services.worker_runtime import clear_max_emails_override, set_max_emails_override
@@ -16,6 +17,7 @@ from app.worker import (
     EXIT_NO_SLOT,
     EXIT_OK,
     EXIT_PIPELINE,
+    _resolve_uid_cursor,
     _validate_config,
     run,
 )
@@ -60,6 +62,46 @@ def test_validate_config_groq_missing_key():
 def test_validate_config_groq_empty_key():
     error = _validate_config(_make_settings(llm_provider="groq", groq_api_key=""))
     assert error is not None
+
+
+@patch("app.worker.get_uid_received_date")
+@patch("app.worker.get_latest_uid")
+def test_resolve_uid_cursor_keeps_recent_uid(mock_latest_uid, mock_uid_date):
+    recent = datetime.now(UTC) - timedelta(days=7)
+    mock_uid_date.return_value = recent
+
+    resolved = _resolve_uid_cursor(123, imap_timeout_seconds=30)
+
+    assert resolved == 123
+    mock_uid_date.assert_called_once_with(123, timeout=30)
+    mock_latest_uid.assert_not_called()
+
+
+@patch("app.worker.get_uid_received_date")
+@patch("app.worker.get_latest_uid")
+def test_resolve_uid_cursor_resets_when_tracked_uid_is_stale(mock_latest_uid, mock_uid_date):
+    stale = datetime.now(UTC) - timedelta(days=45)
+    mock_uid_date.return_value = stale
+    mock_latest_uid.return_value = 999
+
+    resolved = _resolve_uid_cursor(123, imap_timeout_seconds=30)
+
+    assert resolved == 999
+    mock_uid_date.assert_called_once_with(123, timeout=30)
+    mock_latest_uid.assert_called_once_with(timeout=30)
+
+
+@patch("app.worker.get_uid_received_date")
+@patch("app.worker.get_latest_uid")
+def test_resolve_uid_cursor_resets_when_tracked_uid_missing(mock_latest_uid, mock_uid_date):
+    mock_uid_date.return_value = None
+    mock_latest_uid.return_value = 888
+
+    resolved = _resolve_uid_cursor(123, imap_timeout_seconds=30)
+
+    assert resolved == 888
+    mock_uid_date.assert_called_once_with(123, timeout=30)
+    mock_latest_uid.assert_called_once_with(timeout=30)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +153,7 @@ def _patch_worker_infra(settings=None, *, worker_run=None, create_run=True):
 
     mock_run_repo = MagicMock()
     mock_run_repo.reconcile_stale_worker_runs.return_value = None
+    mock_run_repo.get_latest_run.return_value = None
     if create_run:
         mock_run_repo.try_create_queued_run.return_value = mock_run_obj
         mock_run_repo.claim_if_queued.return_value = mock_run_obj

@@ -254,3 +254,26 @@ app/
 ### Chunk 5 (verification)
 - Run unit tests for touched phase5/phase6 test modules
 - Fix any lint issues introduced by this change
+
+## Phase 12 Breakdown (manageable chunks)
+
+**Phase:** 12 — UID stale tracking reset  
+**Already done:** Phases 1–11 on `main`, including UID-based incremental fetch in worker runs  
+**This phase delivers:** Cursor reset to mailbox head when the tracked UID points to an email older than 30 days, so stale backlogs are skipped.
+
+### Chunk 1 (staleness decision)
+- Resolve staleness from IMAP email date at tracked UID (not DB record age)
+- If tracked UID date is older than 30 days, reset to latest mailbox UID
+- If tracked UID cannot be resolved on server, reset to latest mailbox UID when available
+
+### Chunk 2 (fetch behavior alignment)
+- Ensure `fetch_recent_emails()` returns newest messages first
+- Keep `since_uid` incremental semantics unchanged for non-stale cursors
+
+### Chunk 3 (tests)
+- Add unit tests for recent UID (no reset), stale UID (reset), and missing UID (reset)
+- Keep existing worker exit-code tests intact
+
+### Chunk 4 (verification)
+- Run targeted unit tests for worker module changes
+- Fix lint issues introduced by this phase
