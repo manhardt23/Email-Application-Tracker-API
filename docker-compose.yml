@@ -1,3 +1,5 @@
+name: email-tracker
+
 services:
   db:
     image: postgres:16-alpine
@@ -20,7 +22,7 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - /home/ubuntu/Email-Application-Tracker-API/.env
+      - ./.env
     environment:
       DATABASE_URL: postgresql://job_tracker_user:job_tracker_pass@db:5432/job_tracker
     ports:
@@ -35,7 +37,7 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - /home/ubuntu/Email-Application-Tracker-API/.env
+      - ./.env
     environment:
       DATABASE_URL: postgresql://job_tracker_user:job_tracker_pass@db:5432/job_tracker
     depends_on:

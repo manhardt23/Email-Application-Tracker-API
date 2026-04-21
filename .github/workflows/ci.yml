@@ -43,13 +43,6 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Resolve EC2 deploy directory
-        id: deploydir
-        run: |
-          D='${{ secrets.EC2_DEPLOY_DIR }}'
-          if [ -z "$D" ]; then D=/opt/email-tracker; fi
-          echo "dir=$D" >> "$GITHUB_OUTPUT"
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
         with:
@@ -80,69 +73,59 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
-            sudo mkdir -p "${{ steps.deploydir.outputs.dir }}"
+            mkdir -p ~/deploy
 
-      - name: Copy compose file to EC2
+      - name: Copy docker-compose.prod.yml to EC2 deploy dir
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           source: "docker-compose.prod.yml"
-          target: "/tmp/email-tracker-deploy"
+          target: "~/deploy/"
 
-      - name: Pull image and restart API on EC2
+      - name: Pull and restart stack on EC2
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          DEPLOY_DIR: ${{ steps.deploydir.outputs.dir }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          IMAP_SERVER: ${{ secrets.IMAP_SERVER }}
+          DEFAULT_EMAIL_LIMIT: ${{ secrets.DEFAULT_EMAIL_LIMIT }}
+          EMAIL_LIMIT: ${{ secrets.EMAIL_LIMIT }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          envs: ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,DEPLOY_DIR
+          envs: ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,EMAIL_USER,EMAIL_PASS,IMAP_SERVER,DEFAULT_EMAIL_LIMIT,EMAIL_LIMIT,GROQ_API_KEY,LLM_PROVIDER,DATABASE_URL,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD
           script: |
             set -euo pipefail
-            #region agent log
-            debug_log() {
-              local hypothesis_id="$1"
-              local message="$2"
-              local data_json="$3"
-              curl -sS -X POST 'http://127.0.0.1:7923/ingest/78abdaf3-fc2e-427a-958d-6cd5bd8c946b' \
-                -H 'Content-Type: application/json' \
-                -H 'X-Debug-Session-Id: 41fc9b' \
-                -d "{\"sessionId\":\"41fc9b\",\"runId\":\"pre-fix\",\"hypothesisId\":\"${hypothesis_id}\",\"location\":\".github/workflows/ci.yml:deploy-ssh-script\",\"message\":\"${message}\",\"data\":${data_json},\"timestamp\":$(date +%s000)}" \
-                >/dev/null 2>&1 || true
-            }
-            #endregion
-            sudo mkdir -p "$DEPLOY_DIR"
-            sudo install -m 644 /tmp/email-tracker-deploy/docker-compose.prod.yml "$DEPLOY_DIR/docker-compose.prod.yml"
             TRACKER_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-            #region agent log
-            echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 message='compose config preflight with TRACKER_IMAGE only'"
-            if sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" config >/tmp/agent_compose_config.out 2>/tmp/agent_compose_config.err; then
-              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 preflight_status=success"
-            else
-              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 preflight_status=failed"
-              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 stderr_begin"
-              sudo sed -n '1,20p' /tmp/agent_compose_config.err
-              echo "AGENT_DEBUG session=41fc9b run=pre-fix hypothesis=H5 stderr_end"
-            fi
-            #endregion
-            #region agent log
-            debug_log "H1" "resolved core deploy vars" "{\"deployDir\":\"$DEPLOY_DIR\",\"imageTag\":\"$IMAGE_TAG\",\"hasEcrRegistry\":$([ -n "${ECR_REGISTRY:-}" ] && echo true || echo false),\"hasEcrRepository\":$([ -n "${ECR_REPOSITORY:-}" ] && echo true || echo false),\"hasTrackerImage\":$([ -n "${TRACKER_IMAGE:-}" ] && echo true || echo false)}"
-            debug_log "H2" "compose file present before compose commands" "{\"composePath\":\"$DEPLOY_DIR/docker-compose.prod.yml\",\"composeExists\":$([ -f "$DEPLOY_DIR/docker-compose.prod.yml" ] && echo true || echo false)}"
-            #endregion
-            aws ecr get-login-password --region "$AWS_REGION" | sudo docker login --username AWS --password-stdin "$ECR_REGISTRY"
-            #region agent log
-            debug_log "H3" "about to run compose down without TRACKER_IMAGE export" "{\"command\":\"docker compose down --remove-orphans\",\"usesTrackerImageInEnv\":false}"
-            #endregion
-            sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" down --remove-orphans
-            #region agent log
-            debug_log "H4" "compose down completed" "{\"command\":\"docker compose down --remove-orphans\",\"status\":\"success\"}"
-            #endregion
-            sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" pull api
-            sudo TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f "$DEPLOY_DIR/docker-compose.prod.yml" up -d --remove-orphans api
+            cat > ~/deploy/.env <<EOF
+            TRACKER_IMAGE=$TRACKER_IMAGE
+            EMAIL_USER=$EMAIL_USER
+            EMAIL_PASS=$EMAIL_PASS
+            IMAP_SERVER=$IMAP_SERVER
+            DEFAULT_EMAIL_LIMIT=$DEFAULT_EMAIL_LIMIT
+            EMAIL_LIMIT=$EMAIL_LIMIT
+            GROQ_API_KEY=$GROQ_API_KEY
+            LLM_PROVIDER=$LLM_PROVIDER
+            DATABASE_URL=$DATABASE_URL
+            POSTGRES_DB=$POSTGRES_DB
+            POSTGRES_USER=$POSTGRES_USER
+            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+            EOF
+            chmod 600 ~/deploy/.env
+            cd ~/deploy
+            aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+            TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml pull
+            TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans

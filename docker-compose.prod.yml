@@ -1,15 +1,15 @@
 # EC2 production API — image is set at deploy time (ECR URI + tag).
-# Expects host env file at /etc/tracker.env (DATABASE_URL, email, LLM keys, etc.).
-# IMPORTANT: DATABASE_URL in /etc/tracker.env must use `db`, not `localhost`.
+# Expects host env file at ~/deploy/.env (DATABASE_URL, email, LLM keys, etc.).
+# IMPORTANT: DATABASE_URL in ~/deploy/.env must use `db`, not `localhost`.
+name: email-tracker
+
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets:
-      - postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - /home/ubuntu/Email-Application-Tracker-API/.env
+      - ./.env
     depends_on:
       db:
         condition: service_healthy
@@ -31,7 +31,3 @@ services:
 
 volumes:
   postgres_data:
-
-secrets:
-  postgres_password:
-    file: /home/ubuntu/Email-Application-Tracker-API/.env
