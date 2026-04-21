@@ -91,41 +91,16 @@ jobs:
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          IMAP_SERVER: ${{ secrets.IMAP_SERVER }}
-          DEFAULT_EMAIL_LIMIT: ${{ secrets.DEFAULT_EMAIL_LIMIT }}
-          EMAIL_LIMIT: ${{ secrets.EMAIL_LIMIT }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          envs: ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION,EMAIL_USER,EMAIL_PASS,IMAP_SERVER,DEFAULT_EMAIL_LIMIT,EMAIL_LIMIT,GROQ_API_KEY,LLM_PROVIDER,DATABASE_URL,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD
+          envs: ECR_REGISTRY,ECR_REPOSITORY,IMAGE_TAG,AWS_REGION
           script: |
             set -euo pipefail
             TRACKER_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-            cat > ~/deploy/.env <<EOF
-            TRACKER_IMAGE=$TRACKER_IMAGE
-            EMAIL_USER=$EMAIL_USER
-            EMAIL_PASS=$EMAIL_PASS
-            IMAP_SERVER=$IMAP_SERVER
-            DEFAULT_EMAIL_LIMIT=$DEFAULT_EMAIL_LIMIT
-            EMAIL_LIMIT=$EMAIL_LIMIT
-            GROQ_API_KEY=$GROQ_API_KEY
-            LLM_PROVIDER=$LLM_PROVIDER
-            DATABASE_URL=$DATABASE_URL
-            POSTGRES_DB=$POSTGRES_DB
-            POSTGRES_USER=$POSTGRES_USER
-            POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-            EOF
-            chmod 600 ~/deploy/.env
             cd ~/deploy
+            test -f .env
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml pull
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans
