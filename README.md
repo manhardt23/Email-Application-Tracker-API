@@ -14,6 +14,8 @@ This project tracks real job application progress by:
 
 Source-of-truth plan and phase history: `PLAN.md`.
 
+Deployed on EC2. Live API docs: [http://3.93.168.186:8000/docs](http://3.93.168.186:8000/docs).
+
 ### Phase Progress
 
 | # | Phase | Status | Deliverable |
@@ -27,8 +29,8 @@ Source-of-truth plan and phase history: `PLAN.md`.
 | 7 | Tests | Complete | Unit + integration tests, coverage gate in `pyproject.toml` |
 | 8 | Docker | Complete | Multi-stage image + Compose for local/prod |
 | 9 | CI/CD | Complete | GitHub Actions test + deploy pipeline |
-| 10 | AWS Deployment | In progress | EC2 deployment model with Compose + scheduled worker runs |
-| 11 | Runtime Worker Limit API | In progress | `POST /api/v1/jobs/email-limit` in-memory worker override |
+| 10 | AWS Deployment | Complete | EC2 deployment model with Compose + scheduled worker runs |
+| 11 | Runtime Worker Limit API | Complete | `POST /api/v1/jobs/email-limit` in-memory worker override |
 
 ## Architecture (Current)
 
@@ -49,7 +51,7 @@ The worker stays decoupled from API request/response flow and runs as a one-shot
 - **Data layer:** SQLAlchemy 2.x repositories + Alembic migration assets
 - **Database:** PostgreSQL 16 (Compose-managed)
 - **Email ingestion/parsing:** IMAP + BeautifulSoup4 + `quick_filter` pre-screening
-- **LLM integration:** Groq (`llama-3.1-8b-instant`) and Ollama via provider abstraction
+- **LLM integration:** Groq (`llama-3.3-70b-versatile`) and Ollama via provider abstraction
 - **Containerization:** Docker multi-stage build + Docker Compose
 - **Quality/verification:** pytest, pytest-cov, ruff
 - **CI/CD + cloud:** GitHub Actions, Amazon ECR, EC2 (SSH deploy workflow)

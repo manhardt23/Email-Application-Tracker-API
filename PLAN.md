@@ -4,7 +4,7 @@
 
 - **API:** Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic
 - **Database:** PostgreSQL via Docker Compose `db` service on EC2 (no RDS)
-- **LLM:** Groq free tier (`llama-3.1-8b-instant`) in prod; Ollama for local dev; `quick_filter` pre-screen to minimize API calls
+- **LLM:** Groq free tier (`llama-3.3-70b-versatile`) in prod; Ollama for local dev; `quick_filter` pre-screen to minimize API calls
 - **Email Parsing:** BeautifulSoup structured HTML extraction (Phase 3)
 - **Scheduler:** System crontab on EC2 triggers `app/worker.py` as a Docker container at peak hours — decoupled from API
 - **Infrastructure:** EC2 (t2.micro/t3.micro) + Docker Compose (`api` + `db`) + ECR
@@ -71,7 +71,7 @@ app/
 | 7 | **Tests** ✅ | pytest unit + integration, **≥70%** line coverage, CI-ready test commands |
 | 8 | **Docker** ✅ | Multi-stage Dockerfile, docker-compose for local dev |
 | 9 | **CI/CD** ✅ | GitHub Actions: test on PR/push, ECR image push + SSH deploy on `main` |
-| 10 | **AWS Deployment** | EC2 + Docker Compose (`api` + `db`) + crontab + Secrets Manager |
+| 10 | **AWS Deployment** ✅ | EC2 + Docker Compose (`api` + `db`) + crontab + Secrets Manager |
 
 ## Key Notes
 
@@ -98,7 +98,7 @@ app/
 - Fail fast on invalid provider values with actionable error
 
 ### Chunk 2 (Groq adapter)
-- Implement Groq adapter for `llama-3.1-8b-instant`
+- Implement Groq adapter for `llama-3.3-70b-versatile`
 - Normalize request/response into shared classifier output schema
 - Handle provider/API errors with consistent app-level exceptions
 
@@ -230,9 +230,9 @@ app/
 
 ## Phase 11 Breakdown (manageable chunks)
 
-**Phase:** 11 — Runtime worker email limit override  
-**Already done:** Phases 1–9 complete, with worker using env defaults (`MAX_EMAILS_PER_RUN` and legacy `EMAIL_LIMIT`)  
-**This phase delivers:** A non-`PATCH` API endpoint to set a process-local in-memory override (`1..1000`) for worker email fetch count, used on subsequent in-process runs.
+**Phase:** 11 — Runtime worker email limit override — **✅ complete**  
+**Already done:** Phases 1–10 complete, with worker using env defaults (`MAX_EMAILS_PER_RUN` and legacy `EMAIL_LIMIT`)  
+**This phase delivered:** A non-`PATCH` API endpoint to set a process-local in-memory override (`1..1000`) for worker email fetch count, used on subsequent in-process runs.
 
 ### Chunk 1 (runtime override state)
 - Add a small worker runtime module with set/get/clear/effective helpers
