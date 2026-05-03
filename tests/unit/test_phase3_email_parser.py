@@ -205,7 +205,8 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
     def _fake_settings():
         return SimpleNamespace(
             llm_provider="ollama", groq_api_key=None,
-            email_limit=1, max_emails_per_run=50, stale_run_ttl_minutes=1440,
+            email_limit=1, imap_timeout_seconds=30,
+            max_emails_per_run=50, stale_run_ttl_minutes=1440,
             safe_summary=lambda: "test"
         )
 
@@ -466,7 +467,8 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     def _fake_settings():
         return SimpleNamespace(
             llm_provider="ollama", groq_api_key=None,
-            email_limit=1, max_emails_per_run=50, stale_run_ttl_minutes=1440,
+            email_limit=1, imap_timeout_seconds=30,
+            max_emails_per_run=50, stale_run_ttl_minutes=1440,
             safe_summary=lambda: "test"
         )
 
@@ -566,7 +568,8 @@ def test_worker_handles_zero_application_emails(monkeypatch, caplog):
     def _fake_settings():
         return SimpleNamespace(
             llm_provider="ollama", groq_api_key=None,
-            email_limit=1, max_emails_per_run=50, stale_run_ttl_minutes=1440,
+            email_limit=1, imap_timeout_seconds=30,
+            max_emails_per_run=50, stale_run_ttl_minutes=1440,
             safe_summary=lambda: "test"
         )
 
