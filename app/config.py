@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     llm_provider: str = "groq"
     groq_api_key: str | None = None
 
+    # JWT — set JWT_SECRET to a long random string in production
+    jwt_secret: str = "changeme"
+    jwt_algorithm: str = "HS256"
+    jwt_expiry_minutes: int = 1440
+
     @field_validator("imap_timeout_seconds")
     @classmethod
     def _positive_timeout(cls, v: int) -> int:
