@@ -145,7 +145,7 @@ docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 
 `POST /jobs/email-check` creates a queued `WorkerRun` row and starts background execution with `worker_run_id`.  
 The worker claims queued runs (`queued -> running`), updates metrics, and marks `completed` or `failed`.  
-`POST /jobs/email-limit` sets an in-memory override used by subsequent in-process worker invocations.
+`POST /jobs/email-limit` sets an in-memory override in the **API** process. It affects worker runs started from that same process (for example after `POST /jobs/email-check` via FastAPI background tasks). A **separate** worker container or `python -m app.worker` cron job does not share that memory; configure `MAX_EMAILS_PER_RUN` / `EMAIL_LIMIT` in the environment for those runs.
 
 ## Testing
 
@@ -227,7 +227,7 @@ docker compose run --rm --profile worker worker
 ## Resume-Justifiable Technical Highlights
 
 - Designed a decoupled worker execution model with DB-backed run state transitions (`queued -> running -> completed/failed`) and conflict protection for concurrent runs.
-- Implemented runtime-safe processing controls (validated `POST /jobs/email-limit` + env-based limits) without redeploying the API.
+- Implemented runtime-safe processing controls (validated `POST /jobs/email-limit` for API-triggered runs plus env-based limits for standalone/cron workers) without redeploying the API.
 - Enforced quality gates in CI (`ruff` + `pytest` + coverage threshold) and maintained an active coverage baseline above the configured floor.
 - Automated container delivery from GitHub Actions to ECR and EC2 with tagged image promotion (`SHA` + `latest`) and remote Compose rollout.
 
