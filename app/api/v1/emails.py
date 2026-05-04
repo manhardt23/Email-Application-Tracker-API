@@ -3,18 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
+from app.auth.dependencies import CurrentUser, get_db
 from app.db.database import SessionLocal
 from app.db.models import Email, EmailAnalysis
 
 router = APIRouter()
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 DbDep = Annotated[Session, Depends(get_db)]
@@ -42,6 +35,7 @@ def _flatten(email: Email) -> dict:
 @router.get("")
 def list_emails(
     db: DbDep,
+    _user: CurrentUser,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
@@ -59,6 +53,7 @@ def list_emails(
 @router.get("/review")
 def list_emails_for_review(
     db: DbDep,
+    _user: CurrentUser,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):

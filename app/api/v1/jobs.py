@@ -5,19 +5,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import AdminUser, CurrentUser, get_db
 from app.db.database import SessionLocal
 from app.db.repositories.worker_run_repo import WorkerRunRepository
 from app.services.worker_runtime import set_max_emails_override
 
 router = APIRouter()
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 DbDep = Annotated[Session, Depends(get_db)]
@@ -38,7 +31,7 @@ def _run_worker(run_id: int) -> None:
 
 
 @router.post("/email-check", status_code=202)
-def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep):
+def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep, _user: AdminUser):
     repo = WorkerRunRepository(db)
     run = repo.try_create_queued_run()
     if run is None:
@@ -51,13 +44,13 @@ def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep):
 
 
 @router.post("/email-limit")
-def set_worker_email_limit(body: WorkerEmailLimitUpdate):
+def set_worker_email_limit(body: WorkerEmailLimitUpdate, _user: AdminUser):
     override = set_max_emails_override(body.max_emails_per_run)
     return {"max_emails_per_run": override, "source": "in_memory_override"}
 
 
 @router.get("/{job_id}")
-def get_job_status(job_id: str, db: DbDep):
+def get_job_status(job_id: str, db: DbDep, _user: CurrentUser):
     try:
         run_id = int(job_id)
     except ValueError:
