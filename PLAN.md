@@ -76,8 +76,8 @@ app/
 | 9   | **CI/CD** ✅             | GitHub Actions: test on PR/push, ECR image push + SSH deploy on `main`        |
 | 10  | **AWS Deployment** ✅    | EC2 + Docker Compose (`api` + `db`) + crontab + Secrets Manager               |
 | 11  | **Runtime email limit** ✅ | `POST /jobs/email-limit` in-memory override (`1..1000`); applies only to worker runs in the API process (see Key Notes) |
-| 12  | **UID stale reset**      | Reset IMAP cursor when tracked UID is older than 30 days or missing on server |
-| 13  | **JWT auth + RBAC**      | `users` table, JWT, `admin` vs `viewer`, seeded demo user                         |
+| 12  | **UID stale reset** ✅   | Reset IMAP cursor when tracked UID is older than 30 days or missing on server |
+| 13  | **JWT auth + RBAC** ✅   | `users` table, JWT, `admin` vs `viewer`, seeded demo user                         |
 | 14  | **Nginx + HTTPS**        | Domain, reverse proxy, Let's Encrypt (prerequisite for public demo)             |
 | 15  | **Frontend dashboard**   | Static HTML/CSS/Tailwind/JS at `/`, login, applications/emails/jobs UI          |
 

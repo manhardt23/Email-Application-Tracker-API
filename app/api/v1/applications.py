@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AdminUser, CurrentUser, get_db
-from app.db.database import SessionLocal
 from app.db.repositories.application_repo import ApplicationRepository
 
 router = APIRouter()

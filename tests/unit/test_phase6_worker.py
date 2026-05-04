@@ -286,10 +286,17 @@ def test_api_email_limit_endpoint_flows_through_to_worker(mock_gs):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
+    from app.api.v1 import jobs as jobs_module
     from app.api.v1.router import api_router
+    from app.auth import dependencies as auth_deps
+    from app.db.models import User
 
+    _admin = User(id=1, username="admin", password_hash="x", role="admin")
     app = FastAPI()
     app.include_router(api_router, prefix="/api/v1")
+    app.dependency_overrides[auth_deps.get_current_user] = lambda: _admin
+    app.dependency_overrides[auth_deps.require_admin] = lambda: _admin
+    app.dependency_overrides[jobs_module.get_db] = lambda: None
     client = TestClient(app)
 
     resp = client.post("/api/v1/jobs/email-limit", json={"max_emails_per_run": 15})

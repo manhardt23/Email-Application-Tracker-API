@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AdminUser, CurrentUser, get_db
-from app.db.database import SessionLocal
 from app.db.repositories.worker_run_repo import WorkerRunRepository
 from app.services.worker_runtime import set_max_emails_override
 

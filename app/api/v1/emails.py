@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import CurrentUser, get_db
-from app.db.database import SessionLocal
 from app.db.models import Email, EmailAnalysis
 
 router = APIRouter()

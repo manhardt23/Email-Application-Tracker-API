@@ -2,13 +2,11 @@
 Phase 13 auth tests — unit tests for hashing + JWT, integration tests for
 login endpoint, protected routes (401/403), and RBAC enforcement.
 """
-from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from jose import jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
