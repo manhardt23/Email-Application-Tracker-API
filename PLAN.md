@@ -83,6 +83,7 @@ app/
 | 16  | **Public stats endpoint** | `GET /stats` with total emails, job-related count, last completed run timestamp, completed run count (7d) |
 | 17  | **React SPA shell**      | Vite React + TS frontend served by FastAPI at `/`, auth login flow, protected dashboard stats |
 | 18  | **Active applications page** | Admin-only applications view with navbar and active-stage filtering in React UI |
+| 19  | **Domain + HTTPS proxy** | Nginx reverse proxy on `jemanhardt.dev` with Let's Encrypt and CI-deployed config |
 
 
 ## Key Notes
@@ -548,4 +549,34 @@ app/
 - Run frontend build
 - Run targeted auth/API tests
 - Run lint on touched files
+
+## Phase 19 Breakdown (manageable chunks)
+
+**Phase:** 19 — Domain + HTTPS reverse proxy  
+**Already done:** SPA + API unified in one container image, routed under FastAPI  
+**This phase delivers:** `jemanhardt.dev` and `www.jemanhardt.dev` served over HTTPS via Nginx in front of the API container.
+
+### Chunk 1 (compose topology)
+
+- Add `nginx` and `certbot` services to `docker-compose.prod.yml`
+- Remove host exposure of API port `8000`; route traffic through Nginx only
+- Mount ACME/certificate volumes for cert issuance and renewal
+
+### Chunk 2 (nginx config assets)
+
+- Add `nginx/conf.d/tracker.http.conf` for initial HTTP and ACME challenge routing
+- Add `nginx/conf.d/tracker.https.conf.example` for post-certificate TLS + redirect setup
+- Configure proxy to preserve host/proto/IP headers
+
+### Chunk 3 (CI deploy sync)
+
+- Ensure deploy job creates nginx/certbot directories on EC2
+- Copy `nginx/**` from repo to `~/deploy` during deploy
+- Keep deploy using one compose file and one container stack
+
+### Chunk 4 (verification + ops handoff)
+
+- Run full lint + tests before commit
+- Provide one-time certbot issuance command for EC2
+- Document config swap step from HTTP config to HTTPS config
 
