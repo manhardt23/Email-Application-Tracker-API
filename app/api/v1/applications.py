@@ -29,7 +29,7 @@ class ApplicationUpdate(BaseModel):
 
 
 @router.get("")
-def list_applications(db: DbDep, _user: CurrentUser, stage: str | None = None):
+def list_applications(db: DbDep, _user: AdminUser, stage: str | None = None):
     repo = ApplicationRepository(db)
     results = repo.get_by_stage(stage) if stage else repo.get_all()
     if not results:

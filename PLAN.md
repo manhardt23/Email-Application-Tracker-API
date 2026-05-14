@@ -82,6 +82,7 @@ app/
 | 15  | **Frontend dashboard**   | Static HTML/CSS/Tailwind/JS at `/`, login, applications/emails/jobs UI          |
 | 16  | **Public stats endpoint** | `GET /stats` with total emails, job-related count, last completed run timestamp, completed run count (7d) |
 | 17  | **React SPA shell**      | Vite React + TS frontend served by FastAPI at `/`, auth login flow, protected dashboard stats |
+| 18  | **Active applications page** | Admin-only applications view with navbar and active-stage filtering in React UI |
 
 
 ## Key Notes
@@ -516,4 +517,35 @@ app/
 - Run backend tests for route changes
 - Run frontend build validation
 - Run lint checks on touched files
+
+## Phase 18 Breakdown (manageable chunks)
+
+**Phase:** 18 — Admin applications page + navigation shell  
+**Already done:** Phase 17 SPA shell with login and stats dashboard  
+**This phase delivers:** A navbar and an admin-only `/applications` page listing active/open applications.
+
+### Chunk 1 (RBAC tightening for applications list)
+
+- Change `GET /api/v1/applications` to require `AdminUser`
+- Update auth tests so viewer receives `403` and admin still has list access
+
+### Chunk 2 (frontend navigation shell)
+
+- Add shared navbar with links for Dashboard and Applications
+- Keep Applications link visible only for admin role
+- Reuse navbar across protected pages
+
+### Chunk 3 (applications page)
+
+- Add protected `/applications` route
+- Add admin-only route guard (`AdminRoute`)
+- Query `/api/v1/applications` via auth API client
+- Filter to active stages: `applied`, `interview`, `assessment`, `offer`
+- Render table with loading/empty/error states
+
+### Chunk 4 (verification)
+
+- Run frontend build
+- Run targeted auth/API tests
+- Run lint on touched files
 

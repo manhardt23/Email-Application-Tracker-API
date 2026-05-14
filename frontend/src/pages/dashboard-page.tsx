@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 
+import { AppNavbar } from "../components/app-navbar";
 import { Card } from "../components/ui/card";
-import { clearToken } from "../lib/auth";
 import { publicApi } from "../lib/api";
 
 type StatsResponse = {
@@ -36,7 +35,6 @@ function formatRelativeTime(timestamp: string | null): string {
 }
 
 export function DashboardPage() {
-  const navigate = useNavigate();
   const stats = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
@@ -48,21 +46,10 @@ export function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="mx-auto max-w-5xl">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Email Tracker Dashboard</h1>
-            <p className="text-sm text-slate-600">Initial SPA shell powered by FastAPI.</p>
-          </div>
-          <button
-            type="button"
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            onClick={() => {
-              clearToken();
-              navigate("/login", { replace: true });
-            }}
-          >
-            Sign out
-          </button>
+        <AppNavbar />
+        <header className="mb-6">
+          <h1 className="text-2xl font-semibold text-slate-900">Email Tracker Dashboard</h1>
+          <p className="text-sm text-slate-600">Initial SPA shell powered by FastAPI.</p>
         </header>
 
         {stats.isLoading ? <p className="text-slate-700">Loading stats...</p> : null}

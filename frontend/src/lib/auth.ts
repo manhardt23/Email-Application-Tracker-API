@@ -20,6 +20,15 @@ function decodePayload(token: string): JwtPayload | null {
   }
 }
 
+export function getTokenRole(): string | null {
+  const token = getToken();
+  if (!token) {
+    return null;
+  }
+  const payload = decodePayload(token);
+  return payload?.role ?? null;
+}
+
 export function getToken(): string | null {
   return window.localStorage.getItem(TOKEN_STORAGE_KEY);
 }
