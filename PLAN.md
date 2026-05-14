@@ -80,6 +80,7 @@ app/
 | 13  | **JWT auth + RBAC** ✅   | `users` table, JWT, `admin` vs `viewer`, seeded demo user                         |
 | 14  | **Nginx + HTTPS**        | Domain, reverse proxy, Let's Encrypt (prerequisite for public demo)             |
 | 15  | **Frontend dashboard**   | Static HTML/CSS/Tailwind/JS at `/`, login, applications/emails/jobs UI          |
+| 16  | **Public stats endpoint** | `GET /stats` with total emails, job-related count, last completed run timestamp, completed run count (7d) |
 
 
 ## Key Notes
@@ -451,4 +452,29 @@ app/
 - Mobile-responsive Tailwind classes on all tables
 - Update README with screenshots and the live URL
 - Run `ruff check .` and `pytest` — no backend changes, but verify nothing broke
+
+## Phase 16 Breakdown (manageable chunks)
+
+**Phase:** 16 — Public operational stats endpoint  
+**Already done:** Phases 1–15 with JWT/RBAC and production worker run tracking  
+**This phase delivers:** A public `GET /api/v1/stats` endpoint for recruiter/demo visibility into processing scale and worker freshness.
+
+### Chunk 1 (stats route)
+
+- Add `app/api/v1/stats.py` with no auth dependency
+- Return:
+  - `total_emails_processed` (count of `emails`)
+  - `job_related_emails` (count of `email_analyses.is_application=true`)
+  - `worker_last_ran_at` (latest completed `worker_runs.finished_at`)
+  - `worker_run_count_7d` (completed runs finished in last 7 days)
+
+### Chunk 2 (router wiring)
+
+- Register `/api/v1/stats` in `app/api/v1/router.py`
+
+### Chunk 3 (tests + verification)
+
+- Add endpoint tests for empty DB and populated aggregates
+- Verify endpoint remains public (no token required)
+- Run targeted tests and lint on touched files
 

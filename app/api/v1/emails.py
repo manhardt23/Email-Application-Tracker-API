@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth.dependencies import CurrentUser, get_db
+from app.auth.dependencies import AdminUser, CurrentUser, get_db
 from app.db.models import Email, EmailAnalysis
 
 router = APIRouter()
@@ -34,7 +34,7 @@ def _flatten(email: Email) -> dict:
 @router.get("")
 def list_emails(
     db: DbDep,
-    _user: CurrentUser,
+    _user: AdminUser,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):

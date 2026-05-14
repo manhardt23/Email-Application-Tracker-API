@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import AdminUser, CurrentUser, get_db
+from app.auth.dependencies import AdminUser, get_db
 from app.db.repositories.worker_run_repo import WorkerRunRepository
 from app.services.worker_runtime import set_max_emails_override
 
@@ -49,7 +49,7 @@ def set_worker_email_limit(body: WorkerEmailLimitUpdate, _user: AdminUser):
 
 
 @router.get("/{job_id}")
-def get_job_status(job_id: str, db: DbDep, _user: CurrentUser):
+def get_job_status(job_id: str, db: DbDep, _user: AdminUser):
     try:
         run_id = int(job_id)
     except ValueError:

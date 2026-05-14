@@ -39,7 +39,7 @@ def list_applications(db: DbDep, _user: CurrentUser, stage: str | None = None):
 
 
 @router.get("/{application_id}")
-def get_application(application_id: int, db: DbDep, _user: CurrentUser):
+def get_application(application_id: int, db: DbDep, _user: AdminUser):
     result = ApplicationRepository(db).get_by_id(application_id)
     if not result:
         raise HTTPException(status_code=404, detail="Application not found")

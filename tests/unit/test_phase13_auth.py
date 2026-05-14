@@ -289,6 +289,12 @@ def test_viewer_set_email_limit_returns_403(db, live_client):
     assert resp.status_code == 403
 
 
+def test_viewer_get_job_status_returns_403(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.get("/api/v1/jobs/1", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+
+
 def test_admin_can_trigger_email_check(db, live_client):
     token = _admin_token(db)
     with patch("app.api.v1.jobs._run_worker"):
@@ -298,7 +304,19 @@ def test_admin_can_trigger_email_check(db, live_client):
     assert resp.status_code == 202
 
 
-def test_viewer_can_read_emails(db, live_client):
+def test_viewer_get_emails_returns_403(db, live_client):
     token = _viewer_token(db)
     resp = live_client.get("/api/v1/emails", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 403
+
+
+def test_viewer_can_read_emails_review(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.get("/api/v1/emails/review", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
+
+
+def test_viewer_can_list_applications(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.get("/api/v1/applications", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code in (200, 404)
