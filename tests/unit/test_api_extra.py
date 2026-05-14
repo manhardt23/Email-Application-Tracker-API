@@ -103,7 +103,7 @@ def test_get_application_404_for_missing(client):
 
 
 def test_stats_returns_zeroed_counts_when_empty(client):
-    resp = client.get("/api/v1/stats")
+    resp = client.get("/stats")
     assert resp.status_code == 200
     assert resp.json() == {
         "total_emails_processed": 0,
@@ -163,7 +163,7 @@ def test_stats_returns_aggregates(client, db):
     db.add_all([completed_recent, completed_old, running_recent])
     db.commit()
 
-    resp = client.get("/api/v1/stats")
+    resp = client.get("/stats")
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["total_emails_processed"] == 2

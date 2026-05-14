@@ -16,6 +16,7 @@ from app.api.v1 import applications as apps_module
 from app.api.v1 import emails as emails_module
 from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
+from app.api.v1.stats import router as stats_router
 from app.auth import dependencies as auth_deps
 from app.auth.hashing import hash_password, verify_password
 from app.auth.jwt_handler import create_access_token, decode_access_token
@@ -60,6 +61,7 @@ def _make_app(*, auth_override: bool = False):
     """Build a test app. auth_override=True bypasses JWT (as prod routes need tokens)."""
     _app = FastAPI()
     _app.include_router(api_router, prefix="/api/v1")
+    _app.include_router(stats_router, prefix="/stats", tags=["stats"])
     _app.dependency_overrides[apps_module.get_db] = _override_get_db
     _app.dependency_overrides[emails_module.get_db] = _override_get_db
     _app.dependency_overrides[jobs_module.get_db] = _override_get_db

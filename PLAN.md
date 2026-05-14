@@ -81,6 +81,7 @@ app/
 | 14  | **Nginx + HTTPS**        | Domain, reverse proxy, Let's Encrypt (prerequisite for public demo)             |
 | 15  | **Frontend dashboard**   | Static HTML/CSS/Tailwind/JS at `/`, login, applications/emails/jobs UI          |
 | 16  | **Public stats endpoint** | `GET /stats` with total emails, job-related count, last completed run timestamp, completed run count (7d) |
+| 17  | **React SPA shell**      | Vite React + TS frontend served by FastAPI at `/`, auth login flow, protected dashboard stats |
 
 
 ## Key Notes
@@ -477,4 +478,42 @@ app/
 - Add endpoint tests for empty DB and populated aggregates
 - Verify endpoint remains public (no token required)
 - Run targeted tests and lint on touched files
+
+## Phase 17 Breakdown (manageable chunks)
+
+**Phase:** 17 — React SPA shell served by FastAPI  
+**Already done:** Phases 1–16, including JWT auth (`/api/v1/auth/login`) and public stats aggregation  
+**This phase delivers:** Single-domain UX where FastAPI serves API/docs and a built React SPA from one Docker image.
+
+### Chunk 1 (routing decisions + backend wiring)
+
+- Keep existing API namespace under `/api/v1/*`
+- Keep docs public at `/docs` and `/openapi.json`
+- Expose stats at public root (`/stats`)
+- Mount built frontend static assets at `/` last, with SPA fallback to `index.html`
+
+### Chunk 2 (frontend scaffold)
+
+- Create `frontend/` with Vite + React + TypeScript
+- Add Tailwind CSS + shadcn/ui baseline helpers/components
+- Add React Router + TanStack Query setup
+
+### Chunk 3 (auth + dashboard MVP)
+
+- Add `/login` page with email/password form posting to `/api/v1/auth/login`
+- Store JWT in localStorage and inject as Bearer for API calls
+- Add protected `/` route showing stats from `/stats`
+- Add 401 interceptor to clear token and redirect to `/login`
+
+### Chunk 4 (container build + env docs)
+
+- Update Dockerfile to build frontend and copy `frontend/dist` into runtime image
+- Keep single process/container deployment model
+- Update `.env.example` with any frontend-related env knobs
+
+### Chunk 5 (verification)
+
+- Run backend tests for route changes
+- Run frontend build validation
+- Run lint checks on touched files
 

@@ -29,6 +29,7 @@ from app.api.v1 import applications as apps_module
 from app.api.v1 import emails as emails_module
 from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
+from app.api.v1.stats import router as stats_router
 from app.auth import dependencies as auth_deps
 from app.db.models import Base, User
 
@@ -94,6 +95,7 @@ def app(fresh_db):  # noqa: ARG001
     """FastAPI app with all v1 routes, DB and auth dependencies overridden."""
     _app = FastAPI()
     _app.include_router(api_router, prefix="/api/v1")
+    _app.include_router(stats_router, prefix="/stats", tags=["stats"])
     _app.dependency_overrides[apps_module.get_db] = _override_get_db
     _app.dependency_overrides[emails_module.get_db] = _override_get_db
     _app.dependency_overrides[jobs_module.get_db] = _override_get_db
