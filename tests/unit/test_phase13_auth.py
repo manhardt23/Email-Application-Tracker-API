@@ -3,6 +3,7 @@ Phase 13 auth tests — unit tests for hashing + JWT, integration tests for
 login endpoint, protected routes (401/403), and RBAC enforcement.
 """
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -123,16 +124,18 @@ def test_create_and_decode_token():
 def test_decode_token_expired():
     from jose import JWTError
 
+    test_jwt_signing_key = f"unit-test-jwt-key-{uuid4().hex}"
+
     with patch("app.auth.jwt_handler.get_settings") as mock_gs:
         s = mock_gs.return_value
-        s.jwt_secret = "testsecret"
+        s.jwt_secret = test_jwt_signing_key
         s.jwt_algorithm = "HS256"
         s.jwt_expiry_minutes = -1  # already expired
         token = create_access_token("bob", "viewer")
 
     with patch("app.auth.jwt_handler.get_settings") as mock_gs2:
         s2 = mock_gs2.return_value
-        s2.jwt_secret = "testsecret"
+        s2.jwt_secret = test_jwt_signing_key
         s2.jwt_algorithm = "HS256"
         with pytest.raises(JWTError):
             decode_access_token(token)
