@@ -6,7 +6,7 @@ import { authApi } from "../lib/api";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -17,7 +17,7 @@ export function LoginPage() {
     setError(null);
     try {
       const body = new URLSearchParams({
-        username: email,
+        username,
         password,
       });
       const response = await authApi.post("/auth/login", body, {
@@ -46,12 +46,12 @@ export function LoginPage() {
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Email</span>
+            <span className="mb-1 block text-sm font-medium text-slate-700">Username</span>
             <input
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
             />
