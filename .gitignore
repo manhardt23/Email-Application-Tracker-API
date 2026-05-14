@@ -208,6 +208,9 @@ cython_debug/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+!frontend/src/
+!frontend/src/lib/
+!frontend/src/lib/**
 
 # Marimo
 marimo/_static/
