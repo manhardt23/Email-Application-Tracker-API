@@ -17,7 +17,8 @@ from app.api.v1 import applications as apps_module
 from app.api.v1 import emails as emails_module
 from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
-from app.db.models import Application, Base, Company, Email, EmailAnalysis, WorkerRun
+from app.auth import dependencies as auth_deps
+from app.db.models import Application, Base, Company, Email, EmailAnalysis, User, WorkerRun
 from app.services.worker_runtime import clear_max_emails_override, get_max_emails_override
 
 # ---------------------------------------------------------------------------
@@ -54,11 +55,15 @@ def fresh_db():
 @pytest.fixture
 def app():
     # Build a minimal FastAPI app — skip lifespan to avoid real DB creation.
+    _admin = User(id=1, username="admin", password_hash="x", role="admin")
     _app = FastAPI()
     _app.include_router(api_router, prefix="/api/v1")
     _app.dependency_overrides[apps_module.get_db] = override_get_db
     _app.dependency_overrides[emails_module.get_db] = override_get_db
     _app.dependency_overrides[jobs_module.get_db] = override_get_db
+    _app.dependency_overrides[auth_deps.get_db] = override_get_db
+    _app.dependency_overrides[auth_deps.get_current_user] = lambda: _admin
+    _app.dependency_overrides[auth_deps.require_admin] = lambda: _admin
     return _app
 
 

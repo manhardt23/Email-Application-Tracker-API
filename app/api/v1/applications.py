@@ -5,18 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.db.database import SessionLocal
+from app.auth.dependencies import AdminUser, CurrentUser, get_db
 from app.db.repositories.application_repo import ApplicationRepository
 
 router = APIRouter()
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 DbDep = Annotated[Session, Depends(get_db)]
@@ -37,7 +29,7 @@ class ApplicationUpdate(BaseModel):
 
 
 @router.get("")
-def list_applications(db: DbDep, stage: str | None = None):
+def list_applications(db: DbDep, _user: CurrentUser, stage: str | None = None):
     repo = ApplicationRepository(db)
     results = repo.get_by_stage(stage) if stage else repo.get_all()
     if not results:
@@ -47,7 +39,7 @@ def list_applications(db: DbDep, stage: str | None = None):
 
 
 @router.get("/{application_id}")
-def get_application(application_id: int, db: DbDep):
+def get_application(application_id: int, db: DbDep, _user: AdminUser):
     result = ApplicationRepository(db).get_by_id(application_id)
     if not result:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -55,7 +47,7 @@ def get_application(application_id: int, db: DbDep):
 
 
 @router.put("/{application_id}")
-def update_application(application_id: int, body: ApplicationUpdate, db: DbDep):
+def update_application(application_id: int, body: ApplicationUpdate, db: DbDep, _user: AdminUser):
     repo = ApplicationRepository(db)
     application = repo.get_by_id(application_id)
     if not application:

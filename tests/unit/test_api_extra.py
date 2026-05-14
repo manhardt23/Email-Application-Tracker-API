@@ -2,12 +2,14 @@
 Additional API endpoint tests for paths not covered by test_phase5_api.py.
 
 Covers: GET /health, GET /applications (list + stage filter + 404),
-        GET /applications/{id}.
+        GET /applications/{id}, GET /stats.
 Uses shared conftest fixtures.
 """
 
 
-from app.db.models import Application, Company
+from datetime import UTC, datetime, timedelta
+
+from app.db.models import Application, Company, Email, EmailAnalysis, WorkerRun
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -93,3 +95,78 @@ def test_get_application_returns_correct_record(client, db):
 def test_get_application_404_for_missing(client):
     resp = client.get("/api/v1/applications/9999")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /stats
+# ---------------------------------------------------------------------------
+
+
+def test_stats_returns_zeroed_counts_when_empty(client):
+    resp = client.get("/api/v1/stats")
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "total_emails_processed": 0,
+        "job_related_emails": 0,
+        "worker_last_ran_at": None,
+        "worker_run_count_7d": 0,
+    }
+
+
+def test_stats_returns_aggregates(client, db):
+    now = datetime.now(UTC)
+
+    email_1 = Email(
+        message_id="m1",
+        uid="1",
+        sender="a@example.com",
+        subject="Application received",
+        received_date=now - timedelta(days=1),
+        body="...",
+    )
+    email_2 = Email(
+        message_id="m2",
+        uid="2",
+        sender="b@example.com",
+        subject="Newsletter",
+        received_date=now - timedelta(days=2),
+        body="...",
+    )
+    db.add_all([email_1, email_2])
+    db.flush()
+
+    db.add_all(
+        [
+            EmailAnalysis(email_id=email_1.id, is_application=True, needs_review=False),
+            EmailAnalysis(email_id=email_2.id, is_application=False, needs_review=True),
+        ]
+    )
+
+    completed_recent = WorkerRun(
+        status="completed",
+        queued_at=now - timedelta(days=1),
+        started_at=now - timedelta(days=1, minutes=5),
+        finished_at=now - timedelta(days=1),
+    )
+    completed_old = WorkerRun(
+        status="completed",
+        queued_at=now - timedelta(days=10),
+        started_at=now - timedelta(days=10, minutes=5),
+        finished_at=now - timedelta(days=10),
+    )
+    running_recent = WorkerRun(
+        status="running",
+        queued_at=now - timedelta(hours=1),
+        started_at=now - timedelta(hours=1),
+        finished_at=None,
+    )
+    db.add_all([completed_recent, completed_old, running_recent])
+    db.commit()
+
+    resp = client.get("/api/v1/stats")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["total_emails_processed"] == 2
+    assert payload["job_related_emails"] == 1
+    assert payload["worker_run_count_7d"] == 1
+    assert payload["worker_last_ran_at"] is not None
