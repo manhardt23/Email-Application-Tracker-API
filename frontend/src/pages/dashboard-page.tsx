@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { AppNavbar } from "../components/app-navbar";
 import { Card } from "../components/ui/card";
 import { publicApi } from "../lib/api";
 
@@ -44,50 +43,43 @@ export function DashboardPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 md:p-8">
-      <div className="mx-auto max-w-5xl">
-        <AppNavbar />
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-900">Email Tracker Dashboard</h1>
-          <p className="text-sm text-slate-600">Initial SPA shell powered by FastAPI.</p>
-        </header>
+    <section className="mx-auto max-w-5xl">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold text-slate-900">Email Tracker Dashboard</h1>
+        <p className="text-sm text-slate-600">Initial SPA shell powered by FastAPI.</p>
+      </header>
 
-        {stats.isLoading ? <p className="text-slate-700">Loading stats...</p> : null}
-        {stats.isError ? (
-          <p className="text-red-600">
-            Could not load stats. Verify the API is reachable and retry.
-          </p>
-        ) : null}
+      {stats.isLoading ? <p className="text-slate-700">Loading stats...</p> : null}
+      {stats.isError ? (
+        <p className="text-red-600">Could not load stats. Verify the API is reachable and retry.</p>
+      ) : null}
 
-        {stats.data ? (
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <p className="text-sm text-slate-600">Total emails processed</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
-                {stats.data.total_emails_processed}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-600">Job-related emails</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
-                {stats.data.job_related_emails}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-600">Worker last ran</p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">
-                {formatRelativeTime(stats.data.worker_last_ran_at)}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-sm text-slate-600">Completed runs (7d)</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
-                {stats.data.worker_run_count_7d}
-              </p>
-            </Card>
-          </section>
-        ) : null}
-      </div>
-    </main>
+      {stats.data ? (
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <p className="text-sm text-slate-600">Total emails processed</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {stats.data.total_emails_processed}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-slate-600">Job-related emails</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {stats.data.job_related_emails}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-slate-600">Worker last ran</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900">
+              {formatRelativeTime(stats.data.worker_last_ran_at)}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-slate-600">Completed runs (7d)</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{stats.data.worker_run_count_7d}</p>
+          </Card>
+        </section>
+      ) : null}
+    </section>
   );
 }

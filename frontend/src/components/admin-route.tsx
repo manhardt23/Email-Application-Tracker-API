@@ -13,7 +13,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
     return <Navigate to="/login" replace />;
   }
   if (getTokenRole() !== "admin") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/forbidden" replace />;
   }
   return children;
 }
