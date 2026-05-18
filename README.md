@@ -14,7 +14,7 @@ This project tracks real job application progress by:
 
 Source-of-truth plan and phase history: `PLAN.md`.
 
-Deployed on EC2. Live API docs: [http://3.93.168.186:8000/docs](http://3.93.168.186:8000/docs).
+Deployed on EC2. Live at jemanhardt.dev
 
 ### Phase Progress
 
