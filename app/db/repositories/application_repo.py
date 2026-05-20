@@ -1,20 +1,33 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from app.db.models import Application
 from app.db.repositories.base import BaseRepository
 
 
+def _with_company(query):
+    return query.options(joinedload(Application.company))
+
+
 class ApplicationRepository(BaseRepository):
     def get_all(self) -> list[Application]:
-        return self.session.query(Application).all()
+        return _with_company(self.session.query(Application)).all()
 
     def get_by_id(self, application_id: int) -> Application | None:
-        return self.session.query(Application).filter(Application.id == application_id).first()
+        return (
+            _with_company(self.session.query(Application))
+            .filter(Application.id == application_id)
+            .first()
+        )
 
     def get_by_stage(self, stage: str) -> list[Application]:
-        return self.session.query(Application).filter(Application.stage == stage).all()
+        return (
+            _with_company(self.session.query(Application))
+            .filter(Application.stage == stage)
+            .all()
+        )
 
     def find_by_company_and_position(self, company_id: int, position: str) -> Application | None:
         return (

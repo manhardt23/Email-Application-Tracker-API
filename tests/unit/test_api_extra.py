@@ -49,7 +49,10 @@ def test_list_applications_returns_all(client, db):
     resp = client.get("/api/v1/applications")
 
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    data = resp.json()
+    assert len(data) == 2
+    names = {item["company"]["name"] for item in data}
+    assert names == {"A Corp", "B Corp"}
 
 
 def test_list_applications_empty_returns_404(client):
