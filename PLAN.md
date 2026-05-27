@@ -737,6 +737,28 @@ app/
 - Run targeted backend tests for API/auth modules
 - Run frontend build and lint checks for touched files
 
+## Phase 30 Breakdown (manageable chunks)
+
+**Phase:** 30 — Cloudflare origin certs only  
+**Already done:** Nginx TLS deployment path with Certbot-based assets  
+**This phase delivers:** Production TLS served only from Cloudflare origin certificates (`origin.pem`/`origin.key`) with Certbot removed from compose and deploy setup.
+
+### Chunk 1 (compose + nginx)
+
+- Remove `certbot` service and Let's Encrypt mounts from `docker-compose.prod.yml`
+- Mount `./nginx/certs` into nginx container at `/etc/nginx/certs`
+- Update nginx TLS config paths to Cloudflare origin cert files
+
+### Chunk 2 (deploy workflow)
+
+- Update CI deploy setup to create `~/deploy/nginx/certs` (no certbot directories)
+- Keep existing nginx config sync and compose restart flow
+
+### Chunk 3 (verification)
+
+- Validate nginx config in container (`nginx -t`)
+- Reload/recreate nginx with updated cert mount and config
+
 ## Phase 25 Breakdown (manageable chunks)
 
 **Phase:** 25 — Visual spacing + surface layering  
