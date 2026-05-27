@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.v1 import applications as apps_module
+from app.api.v1 import dashboard as dashboard_module
 from app.api.v1 import emails as emails_module
 from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
@@ -59,6 +60,7 @@ def app():
     _app = FastAPI()
     _app.include_router(api_router, prefix="/api/v1")
     _app.dependency_overrides[apps_module.get_db] = override_get_db
+    _app.dependency_overrides[dashboard_module.get_db] = override_get_db
     _app.dependency_overrides[emails_module.get_db] = override_get_db
     _app.dependency_overrides[jobs_module.get_db] = override_get_db
     _app.dependency_overrides[auth_deps.get_db] = override_get_db

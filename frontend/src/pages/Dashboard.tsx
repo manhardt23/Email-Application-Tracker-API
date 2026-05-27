@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Card } from "../components/Card";
@@ -8,18 +7,6 @@ import { type RecentApplicationRow, RecentApplicationsCard } from "../components
 import { type TopCompany, TopCompaniesCard } from "../components/cards/TopCompaniesCard";
 import { api } from "../lib/api";
 import { getValidToken } from "../lib/auth";
-
-type ApplicationRecord = {
-  id: number;
-  company_id?: number;
-  position?: string;
-  stage?: string;
-  last_updated?: string;
-  notes?: string | null;
-  company?: {
-    name?: string;
-  } | null;
-};
 
 type Kpi = {
   label: string;
@@ -73,158 +60,123 @@ const FALLBACK_DASHBOARD_DATA: DashboardData = {
   ],
 };
 
-function normalizeStage(value?: string): "applied" | "interview" | "offer" | "rejected" | "other" {
-  const stage = (value ?? "").toLowerCase();
-  if (stage === "applied") return "applied";
-  if (stage === "interview" || stage === "assessment") return "interview";
-  if (stage === "offer") return "offer";
-  if (stage === "rejected") return "rejected";
-  return "other";
-}
+type DashboardMetricsResponse = {
+  total_applications: number;
+  responses_received: number;
+  interviews_scheduled: number;
+  response_rate: number;
+};
 
-function formatDate(value?: string): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
-}
+type DashboardTrendResponse = {
+  day: string;
+  label: string;
+  applications: number;
+};
 
-function startOfWeek(date: Date): Date {
-  const local = new Date(date);
-  const day = local.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  local.setDate(local.getDate() + diff);
-  local.setHours(0, 0, 0, 0);
-  return local;
-}
+type DashboardStatusResponse = {
+  name: "Applied" | "Interview" | "Offer" | "Rejected";
+  value: number;
+};
 
-function weekLabel(date: Date): string {
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+type DashboardRecentResponse = {
+  company: string;
+  role: string;
+  status: RecentApplicationRow["status"];
+  date_applied: string;
+};
 
-function toDashboardData(records: ApplicationRecord[]): DashboardData {
-  const total = records.length;
-  const statusCounts = records.reduce(
-    (acc, item) => {
-      const stage = normalizeStage(item.stage);
-      acc[stage] += 1;
-      return acc;
-    },
-    { applied: 0, interview: 0, offer: 0, rejected: 0, other: 0 },
-  );
-
-  const responses = statusCounts.interview + statusCounts.offer + statusCounts.rejected;
-  const responseRate = total > 0 ? Math.round((responses / total) * 100) : 0;
-
+function toLiveDashboardData(payload: {
+  metrics: DashboardMetricsResponse;
+  trend: DashboardTrendResponse[];
+  status: DashboardStatusResponse[];
+  recent: DashboardRecentResponse[];
+  topCompanies: TopCompany[];
+}): DashboardData {
   const kpis: Kpi[] = [
     {
       label: "Total Applications",
-      value: String(total),
-      trend: `${statusCounts.applied} currently applied`,
+      value: String(payload.metrics.total_applications),
+      trend: "Live aggregate",
       trendClass: "text-emerald-600",
     },
     {
       label: "Responses Received",
-      value: String(responses),
-      trend: `${statusCounts.rejected} closed outcomes`,
+      value: String(payload.metrics.responses_received),
+      trend: "Live aggregate",
       trendClass: "text-emerald-600",
     },
     {
       label: "Interviews Scheduled",
-      value: String(statusCounts.interview),
-      trend: `${statusCounts.offer} offers so far`,
+      value: String(payload.metrics.interviews_scheduled),
+      trend: "Live aggregate",
       trendClass: "text-emerald-600",
     },
     {
       label: "Response Rate",
-      value: `${responseRate}%`,
-      trend: "Calculated from live data",
+      value: `${payload.metrics.response_rate}%`,
+      trend: "Calculated from API",
       trendClass: "text-slate-500",
     },
   ];
 
-  const today = new Date();
-  const thisWeekStart = startOfWeek(today);
-  const weekStarts = Array.from({ length: 6 }, (_, idx) => {
-    const date = new Date(thisWeekStart);
-    date.setDate(thisWeekStart.getDate() - (5 - idx) * 7);
-    return date;
-  });
-  const weekBins = new Map(weekStarts.map((weekStart) => [weekStart.getTime(), 0]));
-
-  records.forEach((item) => {
-    if (!item.last_updated) return;
-    const date = new Date(item.last_updated);
-    if (Number.isNaN(date.getTime())) return;
-    const bucket = startOfWeek(date).getTime();
-    if (weekBins.has(bucket)) {
-      weekBins.set(bucket, (weekBins.get(bucket) ?? 0) + 1);
-    }
-  });
-
-  const applicationsOverTime: ApplicationsOverTimePoint[] = weekStarts.map((weekStart) => ({
-    week: weekLabel(weekStart),
-    applications: weekBins.get(weekStart.getTime()) ?? 0,
+  const applicationsOverTime: ApplicationsOverTimePoint[] = payload.trend.map((point) => ({
+    week: point.label,
+    applications: point.applications,
   }));
 
-  const recentApplications: RecentApplicationRow[] = [...records]
-    .sort((a, b) => {
-      const first = new Date(a.last_updated ?? 0).getTime();
-      const second = new Date(b.last_updated ?? 0).getTime();
-      return second - first;
-    })
-    .slice(0, 8)
-    .map((item) => {
-      const stage = normalizeStage(item.stage);
-      const status: RecentApplicationRow["status"] =
-        stage === "interview" ? "Interview" : stage === "offer" ? "Offer" : stage === "rejected" ? "Rejected" : "Applied";
-      return {
-        company: item.company?.name ?? (typeof item.company_id === "number" ? `Company #${item.company_id}` : "Unknown"),
-        role: item.position ?? "-",
-        status,
-        dateApplied: formatDate(item.last_updated),
-      };
-    });
+  const applicationStatus: ApplicationStatusPoint[] = payload.status.map((item) => ({
+    ...item,
+    color:
+      item.name === "Applied"
+        ? "#6366f1"
+        : item.name === "Interview"
+          ? "#14b8a6"
+          : item.name === "Offer"
+            ? "#f59e0b"
+            : "#f43f5e",
+  }));
 
-  const topCompaniesMap = records.reduce<Map<string, number>>((acc, item) => {
-    const name = item.company?.name ?? (typeof item.company_id === "number" ? `Company #${item.company_id}` : "Unknown");
-    acc.set(name, (acc.get(name) ?? 0) + 1);
-    return acc;
-  }, new Map());
+  const recentApplications: RecentApplicationRow[] = payload.recent.map((row) => ({
+    company: row.company,
+    role: row.role,
+    status: row.status,
+    dateApplied: row.date_applied,
+  }));
 
-  const topCompanies: TopCompany[] = [...topCompaniesMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([company, applications]) => ({ company, applications }));
-
-  const applicationStatus: ApplicationStatusPoint[] = [
-    { name: "Applied", value: statusCounts.applied, color: "#6366f1" },
-    { name: "Interview", value: statusCounts.interview, color: "#14b8a6" },
-    { name: "Offer", value: statusCounts.offer, color: "#f59e0b" },
-    { name: "Rejected", value: statusCounts.rejected, color: "#f43f5e" },
-  ];
-
-  return { kpis, applicationsOverTime, recentApplications, applicationStatus, topCompanies };
+  return {
+    kpis,
+    applicationsOverTime,
+    recentApplications,
+    applicationStatus,
+    topCompanies: payload.topCompanies,
+  };
 }
 
 export function Dashboard() {
   const isAuthenticated = Boolean(getValidToken());
-  const applicationsQuery = useQuery({
-    queryKey: ["dashboard-applications"],
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard-live-data"],
     enabled: isAuthenticated,
     queryFn: async () => {
-      const response = await api.get<ApplicationRecord[]>("/applications");
-      return response.data;
+      const [metricsResponse, trendResponse, statusResponse, recentResponse, topCompaniesResponse] = await Promise.all([
+        api.get<DashboardMetricsResponse>("/dashboard/metrics"),
+        api.get<DashboardTrendResponse[]>("/dashboard/applications-over-time", { params: { days: 30 } }),
+        api.get<DashboardStatusResponse[]>("/dashboard/status-breakdown"),
+        api.get<DashboardRecentResponse[]>("/dashboard/recent-applications", { params: { limit: 8 } }),
+        api.get<TopCompany[]>("/dashboard/top-companies", { params: { limit: 5 } }),
+      ]);
+      return toLiveDashboardData({
+        metrics: metricsResponse.data,
+        trend: trendResponse.data,
+        status: statusResponse.data,
+        recent: recentResponse.data,
+        topCompanies: topCompaniesResponse.data,
+      });
     },
   });
 
-  const liveData = useMemo(
-    () => (applicationsQuery.data ? toDashboardData(applicationsQuery.data) : null),
-    [applicationsQuery.data],
-  );
-
-  const dashboardData = liveData ?? FALLBACK_DASHBOARD_DATA;
-  const isUsingLiveData = Boolean(isAuthenticated && liveData);
+  const dashboardData = dashboardQuery.data ?? FALLBACK_DASHBOARD_DATA;
+  const isUsingLiveData = Boolean(isAuthenticated && dashboardQuery.data);
 
   return (
     <section className="space-y-6">
@@ -258,7 +210,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      {isAuthenticated && applicationsQuery.isLoading ? (
+      {isAuthenticated && dashboardQuery.isLoading ? (
         <Card>
           <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
             Loading live dashboard data...
@@ -266,7 +218,7 @@ export function Dashboard() {
         </Card>
       ) : null}
 
-      {isAuthenticated && applicationsQuery.isError ? (
+      {isAuthenticated && dashboardQuery.isError ? (
         <Card>
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
             Live dashboard data is unavailable for this account right now. Showing demo data instead.

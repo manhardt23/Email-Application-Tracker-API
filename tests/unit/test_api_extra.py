@@ -26,6 +26,33 @@ def _seed_application(db, stage="applied", company_name="Acme"):
     return application
 
 
+def _seed_application_with_dates(
+    db,
+    *,
+    stage="applied",
+    company_name="Acme",
+    position="Engineer",
+    applied_days_ago=0,
+    updated_days_ago=0,
+):
+    company = db.query(Company).filter(Company.name == company_name).first()
+    if not company:
+        company = Company(name=company_name)
+        db.add(company)
+        db.flush()
+    now = datetime.now(UTC)
+    application = Application(
+        company_id=company.id,
+        position=position,
+        stage=stage,
+        applied_date=now - timedelta(days=applied_days_ago),
+        last_updated=now - timedelta(days=updated_days_ago),
+    )
+    db.add(application)
+    db.commit()
+    return application
+
+
 # ---------------------------------------------------------------------------
 # GET /health
 # ---------------------------------------------------------------------------
@@ -173,3 +200,97 @@ def test_stats_returns_aggregates(client, db):
     assert payload["job_related_emails"] == 1
     assert payload["worker_run_count_7d"] == 1
     assert payload["worker_last_ran_at"] is not None
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/dashboard/*
+# ---------------------------------------------------------------------------
+
+
+def test_dashboard_metrics_returns_expected_counts(client, db):
+    _seed_application(db, stage="applied", company_name="A Corp")
+    _seed_application(db, stage="assessment", company_name="B Corp")
+    _seed_application(db, stage="offer", company_name="C Corp")
+    _seed_application(db, stage="rejected", company_name="D Corp")
+
+    resp = client.get("/api/v1/dashboard/metrics")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["total_applications"] == 4
+    assert payload["responses_received"] == 3
+    assert payload["interviews_scheduled"] == 1
+    assert payload["response_rate"] == 75
+
+
+def test_dashboard_applications_over_time_returns_last_30_days(client, db):
+    _seed_application_with_dates(db, company_name="A Corp", applied_days_ago=2)
+    _seed_application_with_dates(db, company_name="B Corp", applied_days_ago=2)
+    _seed_application_with_dates(db, company_name="C Corp", applied_days_ago=10)
+
+    resp = client.get("/api/v1/dashboard/applications-over-time")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert len(payload) == 30
+    assert all("applications" in row and "label" in row for row in payload)
+    total_in_window = sum(row["applications"] for row in payload)
+    assert total_in_window == 3
+
+
+def test_dashboard_status_breakdown_maps_assessment_to_interview(client, db):
+    _seed_application(db, stage="applied", company_name="A Corp")
+    _seed_application(db, stage="assessment", company_name="B Corp")
+    _seed_application(db, stage="interview", company_name="C Corp")
+    _seed_application(db, stage="rejected", company_name="D Corp")
+
+    resp = client.get("/api/v1/dashboard/status-breakdown")
+
+    assert resp.status_code == 200
+    payload = {row["name"]: row["value"] for row in resp.json()}
+    assert payload["Applied"] == 1
+    assert payload["Interview"] == 2
+    assert payload["Offer"] == 0
+    assert payload["Rejected"] == 1
+
+
+def test_dashboard_recent_applications_returns_ordered_records(client, db):
+    _seed_application_with_dates(
+        db,
+        stage="offer",
+        company_name="A Corp",
+        position="Backend Engineer",
+        applied_days_ago=1,
+        updated_days_ago=1,
+    )
+    _seed_application_with_dates(
+        db,
+        stage="applied",
+        company_name="B Corp",
+        position="Frontend Engineer",
+        applied_days_ago=5,
+        updated_days_ago=3,
+    )
+
+    resp = client.get("/api/v1/dashboard/recent-applications?limit=2")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert len(payload) == 2
+    assert payload[0]["company"] == "A Corp"
+    assert payload[0]["status"] == "Offer"
+    assert "date_applied" in payload[0]
+
+
+def test_dashboard_top_companies_returns_ranked_counts(client, db):
+    _seed_application(db, stage="applied", company_name="A Corp")
+    _seed_application(db, stage="interview", company_name="B Corp")
+    _seed_application_with_dates(db, stage="offer", company_name="B Corp", position="Platform Engineer")
+
+    resp = client.get("/api/v1/dashboard/top-companies?limit=2")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert len(payload) == 2
+    assert payload[0]["company"] == "B Corp"
+    assert payload[0]["applications"] == 2

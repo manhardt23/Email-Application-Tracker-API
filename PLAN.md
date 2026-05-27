@@ -706,6 +706,37 @@ app/
 
 - Run frontend build and lint checks for touched files
 
+## Phase 29 Breakdown (manageable chunks)
+
+**Phase:** 29 — Dedicated dashboard aggregate endpoints  
+**Already done:** Phase 28 dashboard auth-aware live/demo switching with frontend-derived live metrics  
+**This phase delivers:** Admin-only dashboard API endpoints for metrics, trend data, status breakdown, recent rows, and top companies; frontend live mode consumes these endpoints directly.
+
+### Chunk 1 (backend endpoint surface)
+
+- Add admin-only `/api/v1/dashboard/*` endpoints:
+  - `metrics`
+  - `applications-over-time`
+  - `status-breakdown`
+  - `recent-applications`
+  - `top-companies`
+- Keep trend window default at 30 days
+
+### Chunk 2 (frontend live wiring)
+
+- Replace live dashboard data derivation from `/applications` with dedicated dashboard endpoints
+- Keep unauthenticated users on stable demo data fallback
+
+### Chunk 3 (tests)
+
+- Add unit API tests for dashboard endpoints and key aggregations
+- Add RBAC coverage for admin-only dashboard endpoints
+
+### Chunk 4 (verification)
+
+- Run targeted backend tests for API/auth modules
+- Run frontend build and lint checks for touched files
+
 ## Phase 25 Breakdown (manageable chunks)
 
 **Phase:** 25 — Visual spacing + surface layering  
