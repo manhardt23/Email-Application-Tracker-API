@@ -2,10 +2,6 @@ server {
     listen 80;
     server_name jemanhardt.dev www.jemanhardt.dev;
 
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
     location / {
         return 301 https://$host$request_uri;
     }
@@ -15,8 +11,8 @@ server {
     listen 443 ssl http2;
     server_name jemanhardt.dev www.jemanhardt.dev;
 
-    ssl_certificate /etc/letsencrypt/live/jemanhardt.dev/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/jemanhardt.dev/privkey.pem;
+    ssl_certificate /etc/nginx/certs/origin.pem;
+    ssl_certificate_key /etc/nginx/certs/origin.key;
 
     location / {
         proxy_pass http://api:8000;
