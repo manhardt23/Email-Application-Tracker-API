@@ -337,11 +337,17 @@ def test_admin_can_list_applications(db, live_client):
 
 def test_viewer_dashboard_metrics_returns_403(db, live_client):
     token = _viewer_token(db)
-    resp = live_client.get("/api/v1/dashboard/metrics", headers={"Authorization": f"Bearer {token}"})
+    resp = live_client.get(
+        "/api/v1/dashboard/metrics",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == 403
 
 
 def test_admin_dashboard_metrics_returns_200(db, live_client):
     token = _admin_token(db)
-    resp = live_client.get("/api/v1/dashboard/metrics", headers={"Authorization": f"Bearer {token}"})
+    resp = live_client.get(
+        "/api/v1/dashboard/metrics",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert resp.status_code == 200

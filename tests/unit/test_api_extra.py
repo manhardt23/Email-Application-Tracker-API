@@ -285,7 +285,12 @@ def test_dashboard_recent_applications_returns_ordered_records(client, db):
 def test_dashboard_top_companies_returns_ranked_counts(client, db):
     _seed_application(db, stage="applied", company_name="A Corp")
     _seed_application(db, stage="interview", company_name="B Corp")
-    _seed_application_with_dates(db, stage="offer", company_name="B Corp", position="Platform Engineer")
+    _seed_application_with_dates(
+        db,
+        stage="offer",
+        company_name="B Corp",
+        position="Platform Engineer",
+    )
 
     resp = client.get("/api/v1/dashboard/top-companies?limit=2")
 
