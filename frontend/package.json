@@ -13,9 +13,11 @@
     "axios": "latest",
     "class-variance-authority": "latest",
     "clsx": "latest",
+    "lucide-react": "^1.16.0",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
+    "recharts": "^2.15.4",
     "tailwind-merge": "latest"
   },
   "devDependencies": {

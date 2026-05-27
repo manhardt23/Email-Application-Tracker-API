@@ -2,9 +2,9 @@ import type { ReactElement } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AdminRoute } from "./components/admin-route";
-import { AppShell } from "./components/app-shell";
+import { AppShell } from "./components/AppShell";
 import { ApplicationsPage } from "./pages/applications-page";
-import { DashboardPage } from "./pages/dashboard-page";
+import { Dashboard } from "./pages/Dashboard";
 import { ForbiddenPage } from "./pages/forbidden-page";
 import { LoginPage } from "./pages/login-page";
 
@@ -16,7 +16,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={withShell(<DashboardPage />)} />
+      <Route path="/" element={withShell(<Dashboard />)} />
       <Route
         path="/applications"
         element={withShell(

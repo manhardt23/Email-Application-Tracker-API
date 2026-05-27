@@ -72,19 +72,14 @@ export function DashboardPage() {
   });
 
   return (
-    <section>
-      <header className="mb-6 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-600 to-teal-600 p-6 text-white shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-wider text-indigo-100">
-          Job Pipeline Intelligence
+    <section className="space-y-6">
+      <header className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Job Pipeline Intelligence</p>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Email Application Tracker</h1>
+        <p className="mt-2 max-w-2xl text-sm text-slate-600">
+          A production-ready system that parses inbox updates, classifies job activity, and turns them into searchable
+          application records.
         </p>
-        <h1 className="mt-2 text-3xl font-semibold">Email Application Tracker</h1>
-        <p className="mt-2 max-w-2xl text-sm text-indigo-50">
-          A production-ready system that parses inbox updates, classifies job activity, and turns them
-          into searchable application records.
-        </p>
-        <div className="mt-4 inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-medium text-indigo-50">
-          Portfolio-ready full-stack delivery
-        </div>
       </header>
 
       {stats.isLoading ? (
@@ -99,7 +94,8 @@ export function DashboardPage() {
       ) : null}
 
       {stats.data ? (
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricTile
             label="Total emails processed"
             value={stats.data.total_emails_processed}
@@ -145,14 +141,16 @@ export function DashboardPage() {
               </svg>
             }
           />
+          </div>
         </section>
       ) : null}
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <Card className="transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card className="shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="rounded-md bg-indigo-100 p-1 text-indigo-700">
+              <span className="rounded-md bg-emerald-100 p-1 text-emerald-700">
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 19h18" />
                   <path d="M7 15l3-3 3 2 4-6" />
@@ -171,7 +169,7 @@ export function DashboardPage() {
                 </div>
                 <div className="h-2 rounded-full bg-slate-100">
                   <div
-                    className="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-teal-500 transition-all"
+                    className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
                     style={{ width: `${value}%` }}
                   />
                 </div>
@@ -180,9 +178,9 @@ export function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <Card className="shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-teal-100 p-1 text-teal-700">
+            <span className="rounded-md bg-indigo-100 p-1 text-indigo-700">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M5 12h14" />
                 <path d="M12 5v14" />
@@ -202,12 +200,14 @@ export function DashboardPage() {
             ))}
           </div>
         </Card>
+        </div>
       </section>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-2">
-        <Card className="transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="grid gap-4 md:grid-cols-2">
+        <Card className="shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-indigo-100 p-1 text-indigo-700">
+            <span className="rounded-md bg-emerald-100 p-1 text-emerald-700">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M4 7h16" />
                 <path d="M7 12h10" />
@@ -221,9 +221,9 @@ export function DashboardPage() {
             so job-search activity stays measurable and actionable.
           </p>
         </Card>
-        <Card className="border-amber-200 bg-amber-50/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+        <Card className="border-slate-200 bg-white shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-amber-100 p-1 text-amber-700">
+            <span className="rounded-md bg-slate-100 p-1 text-slate-700">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="4" y="10" width="16" height="10" rx="2" />
                 <path d="M8 10V7a4 4 0 118 0v3" />
@@ -236,13 +236,14 @@ export function DashboardPage() {
             users get scoped visibility while sensitive records remain private.
           </p>
         </Card>
+        </div>
       </section>
 
-      <section className="mt-6">
-        <Card className="transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <Card className="shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Recent application preview</h2>
-            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">Mock layout</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">Minimal placeholder</span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse overflow-hidden rounded-lg">
@@ -267,14 +268,14 @@ export function DashboardPage() {
                     <td className="px-3 py-3 font-medium text-slate-900">{company}</td>
                     <td className="px-3 py-3">{role}</td>
                     <td className="px-3 py-3">
-                      <span className="rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700">
+                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">
                         {status}
                       </span>
                     </td>
                     <td className="px-3 py-3">
                       <div className="h-2 rounded-full bg-slate-100">
                         <div
-                          className="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-teal-500"
+                          className="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
                           style={{ width: `${momentum}%` }}
                         />
                       </div>

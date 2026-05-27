@@ -32,9 +32,9 @@ const STAGE_OPTIONS: Array<{ value: StageFilter; label: string }> = [
 ];
 
 const STAGE_BADGE_CLASS: Record<string, string> = {
-  applied: "bg-blue-100 text-blue-700",
-  interview: "bg-violet-100 text-violet-700",
-  assessment: "bg-amber-100 text-amber-700",
+  applied: "bg-emerald-100 text-emerald-700",
+  interview: "bg-indigo-100 text-indigo-700",
+  assessment: "bg-teal-100 text-teal-700",
   rejected: "bg-rose-100 text-rose-700",
 };
 
@@ -101,9 +101,10 @@ export function ApplicationsPage() {
   }
 
   return (
-    <section className="rounded-xl border border-slate-200/80 bg-white/95 p-5 shadow-sm ring-1 ring-white backdrop-blur-sm">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="rounded-lg bg-indigo-100 p-2 text-indigo-700">
+    <section className="space-y-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+        <span className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="4" width="18" height="16" rx="2" />
             <path d="M7 9h10" />
@@ -111,16 +112,18 @@ export function ApplicationsPage() {
           </svg>
         </span>
         <h1 className="text-2xl font-semibold text-slate-900">Applications</h1>
+        </div>
+        <p className="mt-2 text-sm text-slate-600">
+          Track stage progression and trigger manual pipeline checks when needed.
+        </p>
       </div>
-      <p className="mt-2 text-sm text-slate-600">
-        Track stage progression and trigger manual pipeline checks when needed.
-      </p>
 
-      <div className="mt-4 flex flex-col gap-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 md:flex-row md:items-end md:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 md:flex-row md:items-end md:justify-between">
         <label className="flex w-full max-w-xs flex-col gap-1 text-sm text-slate-700">
           Stage
           <select
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
             value={stageFilter}
             onChange={(event) => setStageFilter(event.target.value as StageFilter)}
           >
@@ -134,12 +137,13 @@ export function ApplicationsPage() {
 
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-md bg-gradient-to-r from-indigo-600 to-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition duration-200 hover:scale-[1.01] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
           onClick={() => triggerJobMutation.mutate()}
           disabled={triggerJobMutation.isPending}
         >
           {triggerJobMutation.isPending ? "Triggering..." : "Trigger Job"}
         </button>
+        </div>
       </div>
 
       {triggerJobMutation.isSuccess ? (
@@ -189,7 +193,8 @@ export function ApplicationsPage() {
       ) : null}
 
       {query.data && query.data.length > 0 ? (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200/80 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full border-collapse overflow-hidden rounded-lg">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
@@ -204,7 +209,7 @@ export function ApplicationsPage() {
               {query.data.map((item) => (
                 <tr
                   key={item.id}
-                  className="border-b border-slate-100 text-sm text-slate-800 odd:bg-white even:bg-slate-50/40 transition hover:bg-indigo-50/30"
+                  className="border-b border-slate-100 text-sm text-slate-800 odd:bg-white even:bg-slate-50/40 transition hover:bg-emerald-50/30"
                 >
                   <td className="px-3 py-3 font-medium text-slate-900">{companyLabel(item)}</td>
                   <td className="px-3 py-3">{item.position ?? "-"}</td>
@@ -221,6 +226,7 @@ export function ApplicationsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ) : null}
     </section>
