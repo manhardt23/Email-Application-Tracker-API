@@ -2,21 +2,21 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 
 import { Card } from "../Card";
 
-const applicationsOverTime = [
-  { week: "Wk 1", applications: 6 },
-  { week: "Wk 2", applications: 8 },
-  { week: "Wk 3", applications: 7 },
-  { week: "Wk 4", applications: 10 },
-  { week: "Wk 5", applications: 9 },
-  { week: "Wk 6", applications: 12 },
-];
+export type ApplicationsOverTimePoint = {
+  week: string;
+  applications: number;
+};
 
-export function ApplicationsOverTimeCard() {
+type ApplicationsOverTimeCardProps = {
+  data: ApplicationsOverTimePoint[];
+};
+
+export function ApplicationsOverTimeCard({ data }: ApplicationsOverTimeCardProps) {
   return (
     <Card title="Applications Over Time">
       <div className="h-[280px]">
         <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={applicationsOverTime}>
+          <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis dataKey="week" stroke="#64748b" />
             <YAxis stroke="#64748b" allowDecimals={false} />

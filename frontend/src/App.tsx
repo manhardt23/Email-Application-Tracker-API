@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AdminRoute } from "./components/admin-route";
 import { AppShell } from "./components/AppShell";
-import { ApplicationsPage } from "./pages/applications-page";
+import { Applications } from "./pages/Applications";
 import { Dashboard } from "./pages/Dashboard";
 import { ForbiddenPage } from "./pages/forbidden-page";
 import { LoginPage } from "./pages/login-page";
@@ -21,7 +21,7 @@ export default function App() {
         path="/applications"
         element={withShell(
           <AdminRoute>
-            <ApplicationsPage />
+            <Applications />
           </AdminRoute>,
         )}
       />

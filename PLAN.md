@@ -653,6 +653,59 @@ app/
 - Install `recharts` and `lucide-react`
 - Run frontend build and lint checks for touched files
 
+## Phase 27 Breakdown (manageable chunks)
+
+**Phase:** 27 — Modular API-backed applications page  
+**Already done:** Phase 26 modular dashboard shell and card architecture  
+**This phase delivers:** Applications view rebuilt into the same componentized structure as dashboard, using live API data and preserving admin-only behavior.
+
+### Chunk 1 (component extraction)
+
+- Split applications UI into reusable cards (filters, summary, table)
+- Keep shared card styling and spacing consistent with dashboard
+
+### Chunk 2 (page composition)
+
+- Create `Applications` page with dashboard-style layout and header actions
+- Preserve stage filtering, loading, empty, and error states
+
+### Chunk 3 (API behavior)
+
+- Keep data sourced from `GET /applications` with optional stage query
+- Keep manual trigger action via `POST /jobs/email-check`
+- Keep 404 empty-list behavior for filtered queries
+
+### Chunk 4 (routing and verification)
+
+- Route `/applications` to new modular `Applications` page
+- Run frontend build and lint checks for touched files
+
+## Phase 28 Breakdown (manageable chunks)
+
+**Phase:** 28 — Public/demo vs authenticated/live dashboard data  
+**Already done:** Phase 26 modular dashboard layout and Phase 27 modular API-backed applications page  
+**This phase delivers:** Public users can view dashboard immediately with polished preset data, while signed-in users automatically receive live API-backed dashboard data when permitted.
+
+### Chunk 1 (data mode switching)
+
+- Detect auth state in dashboard
+- Use demo data when unauthenticated
+- Attempt live data when authenticated
+
+### Chunk 2 (live data shaping)
+
+- Build dashboard metrics/charts/tables from API application records
+- Keep visual design unchanged while swapping data source
+
+### Chunk 3 (fallback behavior)
+
+- If live fetch fails (for example RBAC restrictions), show a small notice
+- Continue rendering stable demo data to avoid empty/broken dashboard UX
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
 ## Phase 25 Breakdown (manageable chunks)
 
 **Phase:** 25 — Visual spacing + surface layering  
