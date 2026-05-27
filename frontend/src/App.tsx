@@ -1,32 +1,32 @@
+import type { ReactElement } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AdminRoute } from "./components/admin-route";
-import { AppNavbar } from "./components/app-navbar";
-import { ApplicationsPage } from "./pages/applications-page";
-import { DashboardPage } from "./pages/dashboard-page";
+import { AppShell } from "./components/AppShell";
+import { Applications } from "./pages/Applications";
+import { Dashboard } from "./pages/Dashboard";
 import { ForbiddenPage } from "./pages/forbidden-page";
 import { LoginPage } from "./pages/login-page";
 
+function withShell(element: ReactElement): ReactElement {
+  return <AppShell>{element}</AppShell>;
+}
+
 export default function App() {
   return (
-    <main className="min-h-screen bg-slate-100 p-4 md:p-8">
-      <div className="mx-auto max-w-6xl">
-        <AppNavbar />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<DashboardPage />} />
-          <Route
-            path="/applications"
-            element={
-              <AdminRoute>
-                <ApplicationsPage />
-              </AdminRoute>
-            }
-          />
-          <Route path="/forbidden" element={<ForbiddenPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
-    </main>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={withShell(<Dashboard />)} />
+      <Route
+        path="/applications"
+        element={withShell(
+          <AdminRoute>
+            <Applications />
+          </AdminRoute>,
+        )}
+      />
+      <Route path="/forbidden" element={withShell(<ForbiddenPage />)} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

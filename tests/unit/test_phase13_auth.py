@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.v1 import applications as apps_module
+from app.api.v1 import dashboard as dashboard_module
 from app.api.v1 import emails as emails_module
 from app.api.v1 import jobs as jobs_module
 from app.api.v1.router import api_router
@@ -63,6 +64,7 @@ def _make_app(*, auth_override: bool = False):
     _app.include_router(api_router, prefix="/api/v1")
     _app.include_router(stats_router, prefix="/stats", tags=["stats"])
     _app.dependency_overrides[apps_module.get_db] = _override_get_db
+    _app.dependency_overrides[dashboard_module.get_db] = _override_get_db
     _app.dependency_overrides[emails_module.get_db] = _override_get_db
     _app.dependency_overrides[jobs_module.get_db] = _override_get_db
     _app.dependency_overrides[auth_deps.get_db] = _override_get_db
@@ -331,3 +333,21 @@ def test_admin_can_list_applications(db, live_client):
     token = _admin_token(db)
     resp = live_client.get("/api/v1/applications", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code in (200, 404)
+
+
+def test_viewer_dashboard_metrics_returns_403(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.get(
+        "/api/v1/dashboard/metrics",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_dashboard_metrics_returns_200(db, live_client):
+    token = _admin_token(db)
+    resp = live_client.get(
+        "/api/v1/dashboard/metrics",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200

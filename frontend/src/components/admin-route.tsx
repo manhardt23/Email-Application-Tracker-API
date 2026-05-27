@@ -10,7 +10,7 @@ type AdminRouteProps = {
 export function AdminRoute({ children }: AdminRouteProps) {
   const token = getValidToken();
   if (!token) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
   if (getTokenRole() !== "admin") {
     return <Navigate to="/forbidden" replace />;

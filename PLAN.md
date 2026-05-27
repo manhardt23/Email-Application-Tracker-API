@@ -46,45 +46,41 @@ app/
 
 ## API Endpoints (paths below are under `/api/v1/`)
 
-
-| Method | Path                 | Description                                           |
-| ------ | -------------------- | ----------------------------------------------------- |
-| GET    | `/health`            | Liveness check (`/api/v1/health`)                   |
-| GET    | `/applications`      | List all (filter: `?stage=`)                          |
-| GET    | `/applications/{id}` | Single application                                    |
-| PUT    | `/applications/{id}` | Update stage/notes                                    |
-| GET    | `/emails`            | List processed emails                                 |
-| GET    | `/emails/review`     | Emails needing review                                 |
-| POST   | `/jobs/email-check`  | Manual trigger                                        |
+| Method | Path                 | Description                                                            |
+| ------ | -------------------- | ---------------------------------------------------------------------- |
+| GET    | `/health`            | Liveness check (`/api/v1/health`)                                      |
+| GET    | `/applications`      | List all (filter: `?stage=`)                                           |
+| GET    | `/applications/{id}` | Single application                                                     |
+| PUT    | `/applications/{id}` | Update stage/notes                                                     |
+| GET    | `/emails`            | List processed emails                                                  |
+| GET    | `/emails/review`     | Emails needing review                                                  |
+| POST   | `/jobs/email-check`  | Manual trigger                                                         |
 | POST   | `/jobs/email-limit`  | In-memory fetch override (`1..1000`; API process only — see Key Notes) |
-| GET    | `/jobs/{job_id}`     | Job status                                            |
-
+| GET    | `/jobs/{job_id}`     | Job status                                                             |
 
 ## Phases
 
-
-| #   | Phase                   | Deliverable                                                                   |
-| --- | ----------------------- | ----------------------------------------------------------------------------- |
-| 1   | **Foundation** ✅        | Package structure, imports fixed, Pydantic config, requirements.txt           |
-| 2   | **DB Normalization** ✅  | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic             |
-| 3   | **Email Parser** ✅      | Structured BS4 HTML extraction, `Message-ID` dedup                            |
-| 4   | **LLM → Groq** ✅        | Groq adapter, Protocol abstraction, Ollama for local dev                      |
-| 5   | **API Cleanup** ✅       | Full `/api/v1/` endpoints, DB-backed job status                               |
-| 6   | **Worker Entrypoint** ✅ | Hardened `python -m app.worker` for cron/Docker, observability, exit contract |
-| 7   | **Tests** ✅             | pytest unit + integration, **≥70%** line coverage, CI-ready test commands     |
-| 8   | **Docker** ✅            | Multi-stage Dockerfile, docker-compose for local dev                          |
-| 9   | **CI/CD** ✅             | GitHub Actions: test on PR/push, ECR image push + SSH deploy on `main`        |
-| 10  | **AWS Deployment** ✅    | EC2 + Docker Compose (`api` + `db`) + crontab + Secrets Manager               |
-| 11  | **Runtime email limit** ✅ | `POST /jobs/email-limit` in-memory override (`1..1000`); applies only to worker runs in the API process (see Key Notes) |
-| 12  | **UID stale reset** ✅   | Reset IMAP cursor when tracked UID is older than 30 days or missing on server |
-| 13  | **JWT auth + RBAC** ✅   | `users` table, JWT, `admin` vs `viewer`, seeded demo user                         |
-| 14  | **Nginx + HTTPS**        | Domain, reverse proxy, Let's Encrypt (prerequisite for public demo)             |
-| 15  | **Frontend dashboard**   | Static HTML/CSS/Tailwind/JS at `/`, login, applications/emails/jobs UI          |
-| 16  | **Public stats endpoint** | `GET /stats` with total emails, job-related count, last completed run timestamp, completed run count (7d) |
-| 17  | **React SPA shell**      | Vite React + TS frontend served by FastAPI at `/`, auth login flow, protected dashboard stats |
-| 18  | **Active applications page** | Admin-only applications view with navbar and active-stage filtering in React UI |
-| 19  | **Domain + HTTPS proxy** | Nginx reverse proxy on `jemanhardt.dev` with Let's Encrypt and CI-deployed config |
-
+| #   | Phase                        | Deliverable                                                                                                             |
+| --- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Foundation** ✅            | Package structure, imports fixed, Pydantic config, requirements.txt                                                     |
+| 2   | **DB Normalization** ✅      | Fresh schema (`emails`, `email_analyses`, `worker_runs`), Alembic                                                       |
+| 3   | **Email Parser** ✅          | Structured BS4 HTML extraction, `Message-ID` dedup                                                                      |
+| 4   | **LLM → Groq** ✅            | Groq adapter, Protocol abstraction, Ollama for local dev                                                                |
+| 5   | **API Cleanup** ✅           | Full `/api/v1/` endpoints, DB-backed job status                                                                         |
+| 6   | **Worker Entrypoint** ✅     | Hardened `python -m app.worker` for cron/Docker, observability, exit contract                                           |
+| 7   | **Tests** ✅                 | pytest unit + integration, **≥70%** line coverage, CI-ready test commands                                               |
+| 8   | **Docker** ✅                | Multi-stage Dockerfile, docker-compose for local dev                                                                    |
+| 9   | **CI/CD** ✅                 | GitHub Actions: test on PR/push, ECR image push + SSH deploy on `main`                                                  |
+| 10  | **AWS Deployment** ✅        | EC2 + Docker Compose (`api` + `db`) + crontab + Secrets Manager                                                         |
+| 11  | **Runtime email limit** ✅   | `POST /jobs/email-limit` in-memory override (`1..1000`); applies only to worker runs in the API process (see Key Notes) |
+| 12  | **UID stale reset** ✅       | Reset IMAP cursor when tracked UID is older than 30 days or missing on server                                           |
+| 13  | **JWT auth + RBAC** ✅       | `users` table, JWT, `admin` vs `viewer`, seeded demo user                                                               |
+| 14  | **Nginx + HTTPS**            | Domain, reverse proxy, Let's Encrypt (prerequisite for public demo)                                                     |
+| 15  | **Frontend dashboard**       | Static HTML/CSS/Tailwind/JS at `/`, login, applications/emails/jobs UI                                                  |
+| 16  | **Public stats endpoint**    | `GET /stats` with total emails, job-related count, last completed run timestamp, completed run count (7d)               |
+| 17  | **React SPA shell**          | Vite React + TS frontend served by FastAPI at `/`, auth login flow, protected dashboard stats                           |
+| 18  | **Active applications page** | Admin-only applications view with navbar and active-stage filtering in React UI                                         |
+| 19  | **Domain + HTTPS proxy**     | Nginx reverse proxy on `jemanhardt.dev` with Let's Encrypt and CI-deployed config                                       |
 
 ## Key Notes
 
@@ -205,7 +201,7 @@ app/
 
 ### Chunk 2 (logging & correlation)
 
-- Standardize log lines to include `**worker_run_id`** (and job status transitions) where useful
+- Standardize log lines to include `**worker_run_id`\*\* (and job status transitions) where useful
 - Replace ad-hoc `print` with `**logging**` (module logger), levels appropriate for prod vs dev
 - Optional: single log line format (timestamp, level, run id, message) for grep/journald
 
@@ -233,7 +229,7 @@ app/
 
 **Phase:** 7 — Tests & coverage baseline  
 **Already done:** Phases 1–6 on `main` (unit tests exist per phase: `tests/unit/test_phase3_email_parser.py`, `test_phase4_llm_providers.py`, `test_phase5_api.py`, `test_phase6_worker.py`; no repo-wide coverage gate yet)  
-**This phase delivers:** A **repeatable pytest setup** for unit + integration tests, **shared fixtures** where they reduce duplication, **meaningful coverage** of repositories/services/API paths not yet exercised, a documented `**coverage run` / `coverage report`** workflow targeting **≥70%** line coverage, and a **single command** (documented in `README` or `PLAN`) that CI can call later in Phase 9.
+**This phase delivers:** A **repeatable pytest setup** for unit + integration tests, **shared fixtures** where they reduce duplication, **meaningful coverage** of repositories/services/API paths not yet exercised, a documented `**coverage run` / `coverage report`** workflow targeting **≥70%** line coverage, and a **single command\*\* (documented in `README` or `PLAN`) that CI can call later in Phase 9.
 
 ### Chunk 0 (phase bootstrap)
 
@@ -242,7 +238,7 @@ app/
 
 ### Chunk 1 (pytest layout & markers)
 
-- Confirm or add `**pytest.ini`** / `**pyproject.toml**` `[tool.pytest.ini_options]` — `testpaths`, asyncio mode if needed, optional markers (`integration`, `slow`)
+- Confirm or add `**pytest.ini`** / `**pyproject.toml\*\*` `[tool.pytest.ini_options]`—`testpaths`, asyncio mode if needed, optional markers (`integration`, `slow`)
 - Normalize `**tests/unit/**` vs `**tests/integration/**` naming; ensure `tests/conftest.py` (root) can hold shared fixtures without circular imports
 
 ### Chunk 2 (unit coverage — gaps)
@@ -257,12 +253,12 @@ app/
 
 ### Chunk 4 (coverage gate & docs)
 
-- Add `**coverage`** / `**pytest-cov**` to dev dependencies if not present; document `**pytest --cov=app --cov-fail-under=70**` (or equivalent) in `README` or a short comment in `pyproject.toml`
+- Add `**coverage`** / `**pytest-cov**`to dev dependencies if not present; document`**pytest --cov=app --cov-fail-under=70\*\*`(or equivalent) in`README`or a short comment in`pyproject.toml`
 - If **70%** is not yet reachable in one pass, document current % and ratchet plan — prefer failing CI later (Phase 9) over silently lowering the bar
 
 ### Chunk 5 (fixtures & hygiene)
 
-- Extract repeated test setup (DB session, app client, seed helpers) into `**conftest.py`** fixtures
+- Extract repeated test setup (DB session, app client, seed helpers) into `**conftest.py`\*\* fixtures
 - Address flaky patterns (time-dependent tests, unordered collections) early
 
 ### Chunk 6 (verification)
@@ -580,3 +576,241 @@ app/
 - Provide one-time certbot issuance command for EC2
 - Document config swap step from HTTP config to HTTPS config
 
+## Phase 20 Breakdown (manageable chunks)
+
+**Phase:** 20 — Applications page controls  
+**Already done:** Phase 18 admin applications list with active-stage focus  
+**This phase delivers:** Backend stage filtering with `All` option and a page-level manual job trigger button.
+
+### Chunk 1 (stage filter)
+
+- Add stage dropdown on frontend applications page with options: `all`, `applied`, `rejected`, `interview`, `assessment`
+- Drive list requests with `GET /api/v1/applications?stage=<value>` and map `all` to unfiltered `GET /api/v1/applications`
+- Treat API `404` ("no applications found") as an empty state in UI
+
+### Chunk 2 (manual job trigger)
+
+- Add page-level `Trigger Job` button wired to `POST /api/v1/jobs/email-check`
+- Show loading state while request is pending
+- Show success message with returned `job_id` and status, or an error message on failure
+
+### Chunk 3 (verification)
+
+- Run frontend build for type safety and bundling checks
+- Fix any lints introduced by touched frontend files
+
+## Phase 21 Breakdown (manageable chunks)
+
+**Phase:** 21 — Frontend visual polish + dashboard messaging  
+**Already done:** Phase 20 applications controls and backend stage filtering  
+**This phase delivers:** A more professional UI theme across login/dashboard/applications and a dashboard section explaining app purpose + privacy-limited insight.
+
+### Chunk 1 (visual system refresh)
+
+- Apply a consistent professional palette (slate base with indigo/teal accents)
+- Improve card/navbar surface styling (radius, subtle ring/shadow, gradients)
+- Keep UX behavior unchanged
+
+### Chunk 2 (dashboard landing content)
+
+- Treat dashboard as landing experience post-login
+- Add concise "what this app does" content
+- Add privacy-focused "why insight is limited" explanation for showcase context
+
+### Chunk 3 (page polish)
+
+- Refresh login page with stronger project presentation and privacy messaging
+- Refresh applications page controls/table styling while preserving existing endpoint behavior
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
+## Phase 26 Breakdown (manageable chunks)
+
+**Phase:** 26 — Portfolio dashboard layout build  
+**Already done:** Prior shell/dashboard styling passes with light-gray + white card direction  
+**This phase delivers:** New componentized dashboard architecture (AppShell, Sidebar, TopBar, reusable Card, KPI + chart/table cards) with mocked data and API wiring deferred.
+
+### Chunk 1 (shell chrome)
+
+- Build `AppShell`, `Sidebar`, and `TopBar` using flex sibling layout (`min-w-0` on content side)
+- Keep auth interaction in top bar (`Sign in` / `Sign out`) based on token presence
+
+### Chunk 2 (shared card foundation)
+
+- Build reusable `Card` component with optional title/action header
+- Apply consistent rounded/border/shadow/spacing tokens
+
+### Chunk 3 (dashboard composition)
+
+- Build `Dashboard` page with header actions, KPI row, and 2/3 + 1/3 card grid
+- Implement card modules: top companies list, recent applications table, applications-over-time line chart, status donut chart
+- Use mocked constants in each card for layout-first delivery
+
+### Chunk 4 (verification)
+
+- Install `recharts` and `lucide-react`
+- Run frontend build and lint checks for touched files
+
+## Phase 27 Breakdown (manageable chunks)
+
+**Phase:** 27 — Modular API-backed applications page  
+**Already done:** Phase 26 modular dashboard shell and card architecture  
+**This phase delivers:** Applications view rebuilt into the same componentized structure as dashboard, using live API data and preserving admin-only behavior.
+
+### Chunk 1 (component extraction)
+
+- Split applications UI into reusable cards (filters, summary, table)
+- Keep shared card styling and spacing consistent with dashboard
+
+### Chunk 2 (page composition)
+
+- Create `Applications` page with dashboard-style layout and header actions
+- Preserve stage filtering, loading, empty, and error states
+
+### Chunk 3 (API behavior)
+
+- Keep data sourced from `GET /applications` with optional stage query
+- Keep manual trigger action via `POST /jobs/email-check`
+- Keep 404 empty-list behavior for filtered queries
+
+### Chunk 4 (routing and verification)
+
+- Route `/applications` to new modular `Applications` page
+- Run frontend build and lint checks for touched files
+
+## Phase 28 Breakdown (manageable chunks)
+
+**Phase:** 28 — Public/demo vs authenticated/live dashboard data  
+**Already done:** Phase 26 modular dashboard layout and Phase 27 modular API-backed applications page  
+**This phase delivers:** Public users can view dashboard immediately with polished preset data, while signed-in users automatically receive live API-backed dashboard data when permitted.
+
+### Chunk 1 (data mode switching)
+
+- Detect auth state in dashboard
+- Use demo data when unauthenticated
+- Attempt live data when authenticated
+
+### Chunk 2 (live data shaping)
+
+- Build dashboard metrics/charts/tables from API application records
+- Keep visual design unchanged while swapping data source
+
+### Chunk 3 (fallback behavior)
+
+- If live fetch fails (for example RBAC restrictions), show a small notice
+- Continue rendering stable demo data to avoid empty/broken dashboard UX
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
+## Phase 29 Breakdown (manageable chunks)
+
+**Phase:** 29 — Dedicated dashboard aggregate endpoints  
+**Already done:** Phase 28 dashboard auth-aware live/demo switching with frontend-derived live metrics  
+**This phase delivers:** Admin-only dashboard API endpoints for metrics, trend data, status breakdown, recent rows, and top companies; frontend live mode consumes these endpoints directly.
+
+### Chunk 1 (backend endpoint surface)
+
+- Add admin-only `/api/v1/dashboard/*` endpoints:
+  - `metrics`
+  - `applications-over-time`
+  - `status-breakdown`
+  - `recent-applications`
+  - `top-companies`
+- Keep trend window default at 30 days
+
+### Chunk 2 (frontend live wiring)
+
+- Replace live dashboard data derivation from `/applications` with dedicated dashboard endpoints
+- Keep unauthenticated users on stable demo data fallback
+
+### Chunk 3 (tests)
+
+- Add unit API tests for dashboard endpoints and key aggregations
+- Add RBAC coverage for admin-only dashboard endpoints
+
+### Chunk 4 (verification)
+
+- Run targeted backend tests for API/auth modules
+- Run frontend build and lint checks for touched files
+
+## Phase 25 Breakdown (manageable chunks)
+
+**Phase:** 25 — Visual spacing + surface layering  
+**Already done:** Phase 23 admin shell and dashboard composition work  
+**This phase delivers:** A cleaner look with light-gray canvas, softer card geometry, and stronger white-space separation between dashboard/application sections.
+
+### Chunk 1 (shell spacing)
+
+- Increase page breathing room with a muted canvas behind content
+- Keep auth/nav behavior unchanged
+
+### Chunk 2 (dashboard layering)
+
+- Group major dashboard blocks in subtle tinted panels
+- Keep white cards inside panels for clean contrast
+- Preserve all current data and placeholders
+
+### Chunk 3 (applications layering)
+
+- Apply the same panel + card separation to controls and table
+- Keep filter/trigger/query logic unchanged
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
+## Phase 22 Breakdown (manageable chunks)
+
+**Phase:** 22 — Visual depth pass  
+**Already done:** Phase 21 baseline UI polish and privacy messaging  
+**This phase delivers:** Less text-heavy UI with icon-backed metric tiles, stronger visual states, and richer applications table styling.
+
+### Chunk 1 (dashboard visual depth)
+
+- Add icon-backed stat tiles with clearer hierarchy and subtle hover transitions
+- Upgrade dashboard loading/error states into styled callout cards
+
+### Chunk 2 (applications visual depth)
+
+- Add stage summary chips and stage-specific badge colors
+- Add stronger table framing, hover feedback, and improved row hierarchy
+- Keep API behaviors and filtering logic unchanged
+
+### Chunk 3 (micro-interactions)
+
+- Add subtle transition polish to navbar and action controls
+- Preserve readability and contrast
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
+## Phase 23 Breakdown (manageable chunks)
+
+**Phase:** 23 — Admin-style frontend shell  
+**Already done:** Phase 22 visual depth pass and component polish  
+**This phase delivers:** A cleaner admin dashboard structure inspired by modern templates: left sidebar, top context bar, and richer dashboard composition with placeholder chart spacing.
+
+### Chunk 1 (layout shell)
+
+- Add protected app shell with left sidebar nav (`Dashboard`, `Applications`, `API Docs`)
+- Add top bar with section title, role badge, and sign-out action
+- Keep login route outside shell
+
+### Chunk 2 (dashboard composition)
+
+- Expand dashboard into multi-block layout with stats, placeholder activity visualization, highlights, and table preview
+- Keep existing live stats API data intact
+
+### Chunk 3 (routing integration)
+
+- Wrap protected routes with shell layout and keep existing auth/admin guards
+- Preserve current endpoint behavior on all pages
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
