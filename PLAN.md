@@ -580,3 +580,105 @@ app/
 - Provide one-time certbot issuance command for EC2
 - Document config swap step from HTTP config to HTTPS config
 
+## Phase 20 Breakdown (manageable chunks)
+
+**Phase:** 20 — Applications page controls  
+**Already done:** Phase 18 admin applications list with active-stage focus  
+**This phase delivers:** Backend stage filtering with `All` option and a page-level manual job trigger button.
+
+### Chunk 1 (stage filter)
+
+- Add stage dropdown on frontend applications page with options: `all`, `applied`, `rejected`, `interview`, `assessment`
+- Drive list requests with `GET /api/v1/applications?stage=<value>` and map `all` to unfiltered `GET /api/v1/applications`
+- Treat API `404` ("no applications found") as an empty state in UI
+
+### Chunk 2 (manual job trigger)
+
+- Add page-level `Trigger Job` button wired to `POST /api/v1/jobs/email-check`
+- Show loading state while request is pending
+- Show success message with returned `job_id` and status, or an error message on failure
+
+### Chunk 3 (verification)
+
+- Run frontend build for type safety and bundling checks
+- Fix any lints introduced by touched frontend files
+
+## Phase 21 Breakdown (manageable chunks)
+
+**Phase:** 21 — Frontend visual polish + dashboard messaging  
+**Already done:** Phase 20 applications controls and backend stage filtering  
+**This phase delivers:** A more professional UI theme across login/dashboard/applications and a dashboard section explaining app purpose + privacy-limited insight.
+
+### Chunk 1 (visual system refresh)
+
+- Apply a consistent professional palette (slate base with indigo/teal accents)
+- Improve card/navbar surface styling (radius, subtle ring/shadow, gradients)
+- Keep UX behavior unchanged
+
+### Chunk 2 (dashboard landing content)
+
+- Treat dashboard as landing experience post-login
+- Add concise "what this app does" content
+- Add privacy-focused "why insight is limited" explanation for showcase context
+
+### Chunk 3 (page polish)
+
+- Refresh login page with stronger project presentation and privacy messaging
+- Refresh applications page controls/table styling while preserving existing endpoint behavior
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
+## Phase 22 Breakdown (manageable chunks)
+
+**Phase:** 22 — Visual depth pass  
+**Already done:** Phase 21 baseline UI polish and privacy messaging  
+**This phase delivers:** Less text-heavy UI with icon-backed metric tiles, stronger visual states, and richer applications table styling.
+
+### Chunk 1 (dashboard visual depth)
+
+- Add icon-backed stat tiles with clearer hierarchy and subtle hover transitions
+- Upgrade dashboard loading/error states into styled callout cards
+
+### Chunk 2 (applications visual depth)
+
+- Add stage summary chips and stage-specific badge colors
+- Add stronger table framing, hover feedback, and improved row hierarchy
+- Keep API behaviors and filtering logic unchanged
+
+### Chunk 3 (micro-interactions)
+
+- Add subtle transition polish to navbar and action controls
+- Preserve readability and contrast
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
+## Phase 23 Breakdown (manageable chunks)
+
+**Phase:** 23 — Admin-style frontend shell  
+**Already done:** Phase 22 visual depth pass and component polish  
+**This phase delivers:** A cleaner admin dashboard structure inspired by modern templates: left sidebar, top context bar, and richer dashboard composition with placeholder chart spacing.
+
+### Chunk 1 (layout shell)
+
+- Add protected app shell with left sidebar nav (`Dashboard`, `Applications`, `API Docs`)
+- Add top bar with section title, role badge, and sign-out action
+- Keep login route outside shell
+
+### Chunk 2 (dashboard composition)
+
+- Expand dashboard into multi-block layout with stats, placeholder activity visualization, highlights, and table preview
+- Keep existing live stats API data intact
+
+### Chunk 3 (routing integration)
+
+- Wrap protected routes with shell layout and keep existing auth/admin guards
+- Preserve current endpoint behavior on all pages
+
+### Chunk 4 (verification)
+
+- Run frontend build and lint checks for touched files
+
