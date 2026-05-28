@@ -190,7 +190,9 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
             ]
             self.application_emails = self.email_list
 
-        def fetch_emails(self, limit, since_uid=1):  # noqa: ANN001
+        def fetch_emails(  # noqa: ANN001
+            self, limit, since_uid=1, from_date=None, to_date=None
+        ):
             return self.email_list
 
         def analyze_emails(self):
@@ -350,6 +352,7 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     worker_module = importlib.reload(worker_module)
 
     created_message_ids: list[str] = []
+    created_application_positions: list[str] = []
 
     class _FakeWorkerRun:
         def __init__(self) -> None:
@@ -422,7 +425,7 @@ def test_worker_processes_new_email_successfully(monkeypatch):
             self.session = session
 
         def create(self, **kwargs):  # noqa: ANN001
-            return object()
+            return SimpleNamespace(needs_review=False)
 
         def link_to_application(self, analysis, application_id):  # noqa: ANN001
             pass
@@ -431,9 +434,19 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def __init__(self, session):  # noqa: ANN001
             self.session = session
 
+        def find_or_create(self, name):  # noqa: ANN001
+            return SimpleNamespace(id=101, name=name)
+
     class _FakeApplicationRepository:
         def __init__(self, session):  # noqa: ANN001
             self.session = session
+
+        def find_or_create(self, company_id, position):  # noqa: ANN001
+            created_application_positions.append(position)
+            return SimpleNamespace(id=202)
+
+        def update_stage(self, application, new_stage, date):  # noqa: ANN001
+            return None
 
     class _FakeProcessor:
         def __init__(self, classifier):  # noqa: ANN001
@@ -452,7 +465,9 @@ def test_worker_processes_new_email_successfully(monkeypatch):
             self.email_list = [email]
             self.application_emails = self.email_list
 
-        def fetch_emails(self, limit, since_uid=1):  # noqa: ANN001
+        def fetch_emails(  # noqa: ANN001
+            self, limit, since_uid=1, from_date=None, to_date=None
+        ):
             return self.email_list
 
         def analyze_emails(self):
@@ -487,6 +502,7 @@ def test_worker_processes_new_email_successfully(monkeypatch):
 
     assert len(created_message_ids) == 1
     assert created_message_ids[0] == "<new@example.test>"
+    assert created_application_positions == ["Unknown Position"]
 
 
 def test_worker_handles_zero_application_emails(monkeypatch, caplog):
@@ -553,7 +569,9 @@ def test_worker_handles_zero_application_emails(monkeypatch, caplog):
             self.email_list = []
             self.application_emails = []
 
-        def fetch_emails(self, limit, since_uid=1):  # noqa: ANN001
+        def fetch_emails(  # noqa: ANN001
+            self, limit, since_uid=1, from_date=None, to_date=None
+        ):
             return self.email_list
 
         def analyze_emails(self):

@@ -150,6 +150,7 @@ def _patch_worker_infra(settings=None, *, worker_run=None, create_run=True):
 
     mock_run_obj = MagicMock()
     mock_run_obj.id = 42
+    mock_run_obj.last_processed_uid = 55
 
     mock_run_repo = MagicMock()
     mock_run_repo.reconcile_stale_worker_runs.return_value = None
@@ -277,7 +278,12 @@ def test_run_uses_runtime_email_limit_override(mock_gs):
         result = run()
 
     assert result == EXIT_OK
-    infra["processor"].fetch_emails.assert_called_once_with(7, since_uid=1)
+    infra["processor"].fetch_emails.assert_called_once_with(
+        7,
+        since_uid=1,
+        from_date=None,
+        to_date=None,
+    )
 
 
 @patch("app.worker.get_settings")
@@ -319,4 +325,40 @@ def test_api_email_limit_endpoint_flows_through_to_worker(mock_gs):
         result = run()
 
     assert result == EXIT_OK
-    infra["processor"].fetch_emails.assert_called_once_with(15, since_uid=1)
+    infra["processor"].fetch_emails.assert_called_once_with(
+        15,
+        since_uid=1,
+        from_date=None,
+        to_date=None,
+    )
+
+
+@patch("app.worker.get_settings")
+def test_backfill_run_uses_date_window_and_does_not_advance_cursor(mock_gs):
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    latest = MagicMock()
+    latest.last_processed_uid = 321
+    infra["run_repo"].get_latest_run.return_value = latest
+    from_date = datetime(2026, 1, 1, tzinfo=UTC)
+    to_date = datetime(2026, 1, 31, tzinfo=UTC)
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository"), \
+         patch("app.worker.CompanyRepository"), \
+         patch("app.worker.ApplicationRepository"), \
+         patch("app.worker.AnalysisRepository"), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run(backfill_from=from_date, backfill_to=to_date, backfill_max_emails=22)
+
+    assert result == EXIT_OK
+    infra["processor"].fetch_emails.assert_called_once_with(
+        22,
+        since_uid=1,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    assert infra["run_obj"].last_processed_uid == 55

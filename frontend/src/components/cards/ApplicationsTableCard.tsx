@@ -6,7 +6,6 @@ type ApplicationRecord = {
   position?: string;
   stage?: string;
   last_updated?: string;
-  notes?: string | null;
   company?: {
     name?: string;
   } | null;
@@ -48,11 +47,11 @@ export function ApplicationsTableCard({ items }: ApplicationsTableCardProps) {
         <table className="min-w-full border-collapse overflow-hidden rounded-lg">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-sm text-slate-600">
+              <th className="px-3 py-2">Application ID</th>
               <th className="px-3 py-2">Company</th>
               <th className="px-3 py-2">Position</th>
               <th className="px-3 py-2">Stage</th>
               <th className="px-3 py-2">Last Updated</th>
-              <th className="px-3 py-2">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -61,6 +60,7 @@ export function ApplicationsTableCard({ items }: ApplicationsTableCardProps) {
                 key={item.id}
                 className="border-b border-slate-100 text-sm text-slate-800 odd:bg-white even:bg-slate-50/40 transition hover:bg-emerald-50/30"
               >
+                <td className="px-3 py-3 font-mono text-xs text-slate-700">{item.id}</td>
                 <td className="px-3 py-3 font-medium text-slate-900">{companyLabel(item)}</td>
                 <td className="px-3 py-3">{item.position ?? "-"}</td>
                 <td className="px-3 py-2">
@@ -69,7 +69,6 @@ export function ApplicationsTableCard({ items }: ApplicationsTableCardProps) {
                   </span>
                 </td>
                 <td className="px-3 py-2">{formatDate(item.last_updated)}</td>
-                <td className="px-3 py-2">{item.notes || "-"}</td>
               </tr>
             ))}
           </tbody>

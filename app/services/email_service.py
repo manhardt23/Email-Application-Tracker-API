@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from time import perf_counter
 
-from app.email_client.client import fetch_recent_emails
+from app.email_client.client import fetch_emails_by_date_range, fetch_recent_emails
 from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification, LLMClassifier
 
@@ -89,8 +89,21 @@ class EmailProcessor:
         self.email_list: list[EmailData] = []
         self.application_emails: list[EmailData] = []
 
-    def fetch_emails(self, limit: int, since_uid: int = 1) -> list[EmailData]:
-        raw_emails = fetch_recent_emails(limit, since_uid=since_uid)
+    def fetch_emails(
+        self,
+        limit: int,
+        since_uid: int = 1,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> list[EmailData]:
+        if from_date is not None:
+            raw_emails = fetch_emails_by_date_range(
+                limit=limit,
+                from_date=from_date,
+                to_date=to_date,
+            )
+        else:
+            raw_emails = fetch_recent_emails(limit, since_uid=since_uid)
         self.email_list = [
             EmailData(
                 message_id=raw.get("message_id"),

@@ -14,7 +14,6 @@ type ApplicationRecord = {
   position?: string;
   stage?: string;
   last_updated?: string;
-  notes?: string | null;
   company?: {
     name?: string;
   } | null;

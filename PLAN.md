@@ -836,3 +836,32 @@ app/
 ### Chunk 4 (verification)
 
 - Run frontend build and lint checks for touched files
+
+## Phase 26 Breakdown (manageable chunks)
+
+**Phase:** 26 — One-time backdated worker run  
+**Already done:** Normal incremental worker trigger (`POST /jobs/email-check`) with UID cursoring, dedupe guards, and admin-only access controls  
+**This phase delivers:** A one-time admin-triggered backfill run that pulls older missed emails by date window without advancing the normal incremental UID cursor.
+
+### Chunk 1 (API trigger)
+
+- Add `POST /jobs/email-backfill` (admin-only)
+- Accept `from_date` (required), `to_date` (optional, defaults now), and optional `max_emails` cap
+- Validate `from_date <= to_date`
+
+### Chunk 2 (worker backfill mode)
+
+- Add optional backfill args to worker execution path
+- Reuse existing parse/classify/persist pipeline
+- Keep duplicate protections unchanged
+- Prevent backfill runs from mutating `last_processed_uid`
+
+### Chunk 3 (IMAP date-window fetch)
+
+- Add date-range IMAP fetch helper for backfill mode
+- Keep normal incremental UID fetch path untouched
+
+### Chunk 4 (verification)
+
+- Add/adjust unit + integration tests for backfill trigger and worker mode behavior
+- Run focused pytest suite for touched paths

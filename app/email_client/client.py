@@ -4,7 +4,7 @@ import logging
 import re
 import socket
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -99,61 +99,83 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
             len(recent_uids),
         )
 
-        results = []
-        for uid in recent_uids:
-            try:
-                status, msg_data = mail.uid("fetch", uid, "(RFC822)")
-                if status != "OK":
-                    logger.warning("Failed to fetch uid=%s — IMAP status: %s", uid.decode(), status)
-                    continue
+        return _parse_uids(mail, recent_uids)
+    finally:
+        _close_mail(mail)
 
-                for part in msg_data:
-                    if not isinstance(part, tuple):
-                        continue
 
-                    msg = email.message_from_bytes(part[1])
-                    sender = _optional_str(msg.get("From"))
-                    message_id = _optional_str(msg.get("Message-ID"))
-                    if not message_id:
-                        uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                        logger.warning(
-                            "Skipping uid=%s: missing required Message-ID header",
-                            uid_str,
-                        )
-                        continue
+def fetch_emails_by_date_range(
+    limit: int,
+    from_date: datetime,
+    to_date: datetime | None = None,
+) -> list[dict]:
+    """Fetch up to *limit* emails in [from_date, to_date], oldest first."""
+    mail = None
+    end_date = to_date or datetime.now(UTC)
+    from_date_utc = _as_utc(from_date)
+    to_date_utc = _as_utc(end_date)
 
-                    email_date = None
-                    date_str = msg.get("Date")
-                    if date_str:
-                        try:
-                            email_date = parsedate_to_datetime(date_str)
-                        except Exception as e:
-                            logger.warning("Could not parse date for uid=%s: %s", uid.decode(), e)
+    if from_date_utc > to_date_utc:
+        raise ValueError("from_date must be <= to_date")
 
-                    raw_subject = msg.get("Subject")
-                    subject = _decode_subject(raw_subject)
+    imap_since = from_date_utc.strftime("%d-%b-%Y")
+    # IMAP BEFORE is date-only and exclusive; add 1 day to include the end date.
+    imap_before = (to_date_utc + timedelta(days=1)).strftime("%d-%b-%Y")
 
-                    body = _extract_body(msg)
-                    raw_headers = dict(msg.items())
+    for attempt in range(1, _CONNECT_MAX_ATTEMPTS + 1):
+        try:
+            mail = _connect_to_inbox()
+            status, data = mail.uid(
+                "search",
+                None,
+                f'(SINCE "{imap_since}" BEFORE "{imap_before}")',
+            )
+            if status != "OK":
+                _close_mail(mail)
+                mail = None
+                raise RuntimeError(f"IMAP date-range search failed: {status}")
+            break
+        except _TRANSIENT_IMAP_ERRORS as exc:
+            _close_mail(mail)
+            mail = None
+            if attempt < _CONNECT_MAX_ATTEMPTS:
+                logger.warning(
+                    "Transient IMAP error on attempt %d/%d: %s — retrying in %ds",
+                    attempt,
+                    _CONNECT_MAX_ATTEMPTS,
+                    exc,
+                    _CONNECT_RETRY_DELAY_SECONDS,
+                )
+                time.sleep(_CONNECT_RETRY_DELAY_SECONDS)
+            else:
+                logger.error(
+                    "IMAP connection failed after %d attempts: %s",
+                    _CONNECT_MAX_ATTEMPTS,
+                    exc,
+                )
+                raise
+        except imaplib.IMAP4.error as exc:
+            logger.error("Permanent IMAP error: %s", exc)
+            _close_mail(mail)
+            raise
 
-                    results.append({
-                        "message_id": message_id,
-                        "uid": uid.decode(),
-                        "sender": sender,
-                        "subject": subject,
-                        "received_date": email_date,
-                        "body_text": _optional_str(body),
-                        "raw_headers": raw_headers or None,
-                        # Backward-compat aliases; remove after service migration.
-                        "body": body,
-                        "date": email_date,
-                    })
-            except Exception as e:
-                uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
-                logger.error("Error processing email uid=%s: %s", uid_str, e)
+    try:
+        if not data or not data[0]:
+            logger.info("No emails found in backfill date range")
+            return []
+
+        mail_uids = data[0].split()
+        target_uids = mail_uids[:limit]
+        parsed = _parse_uids(mail, target_uids)
+        filtered: list[dict] = []
+        for row in parsed:
+            received = row.get("received_date")
+            if received is None:
                 continue
-
-        return results
+            received_utc = _as_utc(received)
+            if from_date_utc <= received_utc <= to_date_utc:
+                filtered.append(row)
+        return filtered
     finally:
         _close_mail(mail)
 
@@ -294,3 +316,64 @@ def _optional_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _parse_uids(mail, uids: list[bytes]) -> list[dict]:
+    results = []
+    for uid in uids:
+        try:
+            status, msg_data = mail.uid("fetch", uid, "(RFC822)")
+            if status != "OK":
+                logger.warning("Failed to fetch uid=%s — IMAP status: %s", uid.decode(), status)
+                continue
+
+            for part in msg_data:
+                if not isinstance(part, tuple):
+                    continue
+
+                msg = email.message_from_bytes(part[1])
+                sender = _optional_str(msg.get("From"))
+                message_id = _optional_str(msg.get("Message-ID"))
+                if not message_id:
+                    uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
+                    logger.warning(
+                        "Skipping uid=%s: missing required Message-ID header",
+                        uid_str,
+                    )
+                    continue
+
+                email_date = None
+                date_str = msg.get("Date")
+                if date_str:
+                    try:
+                        email_date = parsedate_to_datetime(date_str)
+                    except Exception as e:
+                        logger.warning("Could not parse date for uid=%s: %s", uid.decode(), e)
+
+                raw_subject = msg.get("Subject")
+                subject = _decode_subject(raw_subject)
+
+                body = _extract_body(msg)
+                raw_headers = dict(msg.items())
+
+                results.append({
+                    "message_id": message_id,
+                    "uid": uid.decode(),
+                    "sender": sender,
+                    "subject": subject,
+                    "received_date": email_date,
+                    "body_text": _optional_str(body),
+                    "raw_headers": raw_headers or None,
+                    # Backward-compat aliases; remove after service migration.
+                    "body": body,
+                    "date": email_date,
+                })
+        except Exception as e:
+            uid_str = uid.decode() if isinstance(uid, bytes) else str(uid)
+            logger.error("Error processing email uid=%s: %s", uid_str, e)
+            continue
+    return results
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)

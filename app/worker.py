@@ -51,6 +51,8 @@ EXIT_PIPELINE = 1
 EXIT_NO_SLOT = 2
 EXIT_CONFIG = 3
 UID_STALE_DAYS = 30
+UNKNOWN_COMPANY = "Unknown Company"
+UNKNOWN_POSITION = "Unknown Position"
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +134,12 @@ def _validate_config(settings) -> str | None:
     return None
 
 
-def run(worker_run_id: int | None = None) -> int:
+def run(
+    worker_run_id: int | None = None,
+    backfill_from: datetime | None = None,
+    backfill_to: datetime | None = None,
+    backfill_max_emails: int | None = None,
+) -> int:
     """Run the email pipeline. Returns an EXIT_* code."""
     logger.info("Worker starting — Job Application Email Pipeline")
 
@@ -169,8 +176,9 @@ def run(worker_run_id: int | None = None) -> int:
             if latest_run is not None and latest_run.last_processed_uid is not None
             else 0
         )
+        backfill_mode = backfill_from is not None
         cursor_uid = _resolve_uid_cursor(last_processed_uid, settings.imap_timeout_seconds)
-        since_uid = cursor_uid + 1
+        since_uid = 1 if backfill_mode else cursor_uid + 1
         highest_uid = cursor_uid
 
         if worker_run_id is not None:
@@ -204,17 +212,32 @@ def run(worker_run_id: int | None = None) -> int:
         # Prefer the higher of the two config caps so MAX_EMAILS_PER_RUN
         # is not capped by legacy EMAIL_LIMIT, then apply runtime override.
         configured_limit = max(settings.max_emails_per_run, settings.email_limit)
-        effective_limit = get_effective_max_emails(configured_limit)
-        logger.info(
-            "run_id=%s fetching up to %d emails since_uid=%d",
-            worker_run.id,
-            effective_limit,
-            since_uid,
-        )
+        default_limit = get_effective_max_emails(configured_limit)
+        effective_limit = backfill_max_emails if backfill_max_emails is not None else default_limit
+        if backfill_mode:
+            logger.info(
+                "run_id=%s backfill fetching up to %d emails from_date=%s to_date=%s",
+                worker_run.id,
+                effective_limit,
+                backfill_from.isoformat(),
+                backfill_to.isoformat() if backfill_to else "now",
+            )
+        else:
+            logger.info(
+                "run_id=%s fetching up to %d emails since_uid=%d",
+                worker_run.id,
+                effective_limit,
+                since_uid,
+            )
 
         classifier = build_classifier(settings)
         processor = EmailProcessor(classifier)
-        processor.fetch_emails(effective_limit, since_uid=since_uid)
+        processor.fetch_emails(
+            effective_limit,
+            since_uid=since_uid,
+            from_date=backfill_from,
+            to_date=backfill_to,
+        )
         processor.analyze_emails()
 
         email_repo = EmailRepository(session)
@@ -274,14 +297,28 @@ def run(worker_run_id: int | None = None) -> int:
                     worker_run_id=worker_run.id,
                 )
 
-                if (
-                    email_data.is_application
-                    and email_data.confidence in ("high", "medium")
-                    and email_data.company
-                    and email_data.position
-                ):
-                    company = company_repo.find_or_create(email_data.company)
-                    application = app_repo.find_or_create(company.id, email_data.position)
+                if email_data.is_application:
+                    company_name = (email_data.company or "").strip() or UNKNOWN_COMPANY
+                    position_name = (email_data.position or "").strip() or UNKNOWN_POSITION
+                    used_fallback = (
+                        company_name == UNKNOWN_COMPANY or position_name == UNKNOWN_POSITION
+                    )
+
+                    if used_fallback:
+                        logger.warning(
+                            (
+                                "run_id=%s forcing application insert with fallback values "
+                                "(company=%r position=%r uid=%s)"
+                            ),
+                            run_id,
+                            company_name,
+                            position_name,
+                            email_data.uid,
+                        )
+                        analysis.needs_review = True
+
+                    company = company_repo.find_or_create(company_name)
+                    application = app_repo.find_or_create(company.id, position_name)
                     analysis_repo.link_to_application(analysis, application.id)
                     app_repo.update_stage(application, email_data.stage, email_data.date)
 
@@ -290,7 +327,8 @@ def run(worker_run_id: int | None = None) -> int:
 
         emails_fetched = len(processor.email_list)
         applications_found = len(processor.application_emails)
-        worker_run.last_processed_uid = highest_uid
+        if not backfill_mode:
+            worker_run.last_processed_uid = highest_uid
         run_repo.complete(worker_run, emails_fetched, applications_found, saved)
         session.commit()
 

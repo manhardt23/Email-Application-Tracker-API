@@ -118,11 +118,11 @@ def _seed_email_with_analysis(
     return email
 
 
-def _seed_application(session, stage="applied"):
-    company = Company(name="Acme Corp")
+def _seed_application(session, stage="applied", company_name="Acme Corp", position="Engineer"):
+    company = Company(name=company_name)
     session.add(company)
     session.flush()
-    application = Application(company_id=company.id, position="Engineer", stage=stage)
+    application = Application(company_id=company.id, position=position, stage=stage)
     session.add(application)
     session.commit()
     return application
@@ -256,6 +256,44 @@ def test_put_application_partial_update_no_fields(client, db):
     assert resp.json()["stage"] == "applied"
 
 
+def test_put_application_updates_company_and_position(client, db):
+    application = _seed_application(db, company_name="Old Co", position="Old Role")
+
+    resp = client.put(
+        f"/api/v1/applications/{application.id}",
+        json={"company_name": "New Co", "position": "New Role"},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["company"]["name"] == "New Co"
+    assert data["position"] == "New Role"
+
+
+def test_put_application_conflict_on_existing_company_position(client, db):
+    a1 = _seed_application(db, company_name="Acme", position="Engineer")
+    _seed_application(db, company_name="Beta", position="Analyst")
+
+    resp = client.put(
+        f"/api/v1/applications/{a1.id}",
+        json={"company_name": "Beta", "position": "Analyst"},
+    )
+
+    assert resp.status_code == 409
+
+
+def test_put_application_rejects_blank_company_name(client, db):
+    application = _seed_application(db)
+    resp = client.put(f"/api/v1/applications/{application.id}", json={"company_name": "   "})
+    assert resp.status_code == 422
+
+
+def test_put_application_rejects_blank_position(client, db):
+    application = _seed_application(db)
+    resp = client.put(f"/api/v1/applications/{application.id}", json={"position": ""})
+    assert resp.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # POST /jobs/email-check and GET /jobs/{job_id}
 # ---------------------------------------------------------------------------
@@ -269,6 +307,37 @@ def test_trigger_job_creates_worker_run(client):
     mock_run.assert_called_once_with(int(data["job_id"]))
     assert "job_id" in data
     assert data["status"] == "queued"
+
+
+def test_trigger_backfill_job_creates_worker_run_with_window(client):
+    payload = {
+        "from_date": "2026-01-01T00:00:00Z",
+        "to_date": "2026-02-01T00:00:00Z",
+        "max_emails": 50,
+    }
+    with patch("app.api.v1.jobs._run_worker") as mock_run:
+        resp = client.post("/api/v1/jobs/email-backfill", json=payload)
+
+    assert resp.status_code == 202
+    data = resp.json()
+    mock_run.assert_called_once()
+    called = mock_run.call_args
+    assert called.args[0] == int(data["job_id"])
+    assert called.args[1].isoformat().startswith("2026-01-01T00:00:00")
+    assert called.args[2].isoformat().startswith("2026-02-01T00:00:00")
+    assert called.args[3] == 50
+
+
+def test_trigger_backfill_job_422_for_invalid_date_range(client):
+    payload = {
+        "from_date": "2026-02-01T00:00:00Z",
+        "to_date": "2026-01-01T00:00:00Z",
+    }
+    with patch("app.api.v1.jobs._run_worker") as mock_run:
+        resp = client.post("/api/v1/jobs/email-backfill", json=payload)
+
+    assert resp.status_code == 422
+    mock_run.assert_not_called()
 
 
 def test_get_job_status_returns_run_fields(client, db):
@@ -303,6 +372,21 @@ def test_trigger_job_409_when_already_queued(client, db):
 
     with patch("app.api.v1.jobs._run_worker") as mock_run:
         resp = client.post("/api/v1/jobs/email-check")
+
+    mock_run.assert_not_called()
+    assert resp.status_code == 409
+
+
+def test_trigger_backfill_job_409_when_already_queued(client, db):
+    run = WorkerRun(status="queued")
+    db.add(run)
+    db.commit()
+
+    with patch("app.api.v1.jobs._run_worker") as mock_run:
+        resp = client.post(
+            "/api/v1/jobs/email-backfill",
+            json={"from_date": "2026-01-01T00:00:00Z"},
+        )
 
     mock_run.assert_not_called()
     assert resp.status_code == 409

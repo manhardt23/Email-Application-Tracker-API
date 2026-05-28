@@ -1,4 +1,5 @@
 import traceback
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -19,10 +20,26 @@ class WorkerEmailLimitUpdate(BaseModel):
     max_emails_per_run: int = Field(..., ge=1, le=1000)
 
 
-def _run_worker(run_id: int) -> None:
+class BackfillRequest(BaseModel):
+    from_date: datetime
+    to_date: datetime | None = None
+    max_emails: int | None = Field(default=None, ge=1, le=1000)
+
+
+def _run_worker(
+    run_id: int,
+    backfill_from: datetime | None = None,
+    backfill_to: datetime | None = None,
+    backfill_max_emails: int | None = None,
+) -> None:
     from app.worker import run  # deferred to avoid circular imports
     try:
-        run(worker_run_id=run_id)
+        run(
+            worker_run_id=run_id,
+            backfill_from=backfill_from,
+            backfill_to=backfill_to,
+            backfill_max_emails=backfill_max_emails,
+        )
     except Exception as e:
         # worker.py already calls repo.fail() internally; just log here.
         print(f"Job {run_id} failed: {e}")
@@ -39,6 +56,36 @@ def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep, _user: Adm
     db.refresh(run)
     run_id = run.id
     background_tasks.add_task(_run_worker, run_id)
+    return {"job_id": str(run_id), "status": "queued"}
+
+
+@router.post("/email-backfill", status_code=202)
+def trigger_email_backfill(
+    body: BackfillRequest,
+    background_tasks: BackgroundTasks,
+    db: DbDep,
+    _user: AdminUser,
+):
+    from_date = body.from_date if body.from_date.tzinfo else body.from_date.replace(tzinfo=UTC)
+    to_date = body.to_date or datetime.now(UTC)
+    to_date = to_date if to_date.tzinfo else to_date.replace(tzinfo=UTC)
+    if from_date > to_date:
+        raise HTTPException(status_code=422, detail="from_date must be before or equal to to_date")
+
+    repo = WorkerRunRepository(db)
+    run = repo.try_create_queued_run()
+    if run is None:
+        raise HTTPException(status_code=409, detail="An email check is already running")
+    db.commit()
+    db.refresh(run)
+    run_id = run.id
+    background_tasks.add_task(
+        _run_worker,
+        run_id,
+        from_date,
+        to_date,
+        body.max_emails,
+    )
     return {"job_id": str(run_id), "status": "queued"}
 
 

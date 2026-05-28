@@ -20,11 +20,13 @@ from app.db.models import Application, Company, Email, EmailAnalysis
 # ---------------------------------------------------------------------------
 
 
-def _seed_company_and_application(db, company_name="Integra Corp", stage="applied"):
+def _seed_company_and_application(
+    db, company_name="Integra Corp", stage="applied", position="Dev"
+):
     company = Company(name=company_name)
     db.add(company)
     db.flush()
-    application = Application(company_id=company.id, position="Dev", stage=stage)
+    application = Application(company_id=company.id, position=position, stage=stage)
     db.add(application)
     db.commit()
     return application
@@ -118,6 +120,19 @@ def test_update_application_notes_clears(client, db):
     resp = client.put(f"/api/v1/applications/{app.id}", json={"notes": None})
     assert resp.status_code == 200
     assert resp.json()["notes"] is None
+
+
+@pytest.mark.integration
+def test_update_application_company_and_position(client, db):
+    app = _seed_company_and_application(db, company_name="Acme", position="Engineer")
+    resp = client.put(
+        f"/api/v1/applications/{app.id}",
+        json={"company_name": "Globex", "position": "Platform Engineer"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["company"]["name"] == "Globex"
+    assert payload["position"] == "Platform Engineer"
 
 
 # ---------------------------------------------------------------------------
