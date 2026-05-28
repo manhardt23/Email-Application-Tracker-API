@@ -177,7 +177,12 @@ def run(
             else 0
         )
         backfill_mode = backfill_from is not None
-        cursor_uid = _resolve_uid_cursor(last_processed_uid, settings.imap_timeout_seconds)
+        # Backfill mode is date-window driven; skip UID cursor IMAP lookups.
+        cursor_uid = (
+            last_processed_uid
+            if backfill_mode
+            else _resolve_uid_cursor(last_processed_uid, settings.imap_timeout_seconds)
+        )
         since_uid = 1 if backfill_mode else cursor_uid + 1
         highest_uid = cursor_uid
 
