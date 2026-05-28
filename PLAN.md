@@ -865,3 +865,25 @@ app/
 
 - Add/adjust unit + integration tests for backfill trigger and worker mode behavior
 - Run focused pytest suite for touched paths
+
+## Phase 27 Breakdown (manageable chunks)
+
+**Phase:** 27 — Manual email promotion to applications  
+**Already done:** Automatic application creation now happens during worker ingestion and backfill runs  
+**This phase delivers:** An admin endpoint to promote already-ingested email rows into the applications table when historical rows were missed before the new ingest logic.
+
+### Chunk 1 (promotion endpoint)
+
+- Add `POST /emails/{email_id}/promote` (admin-only)
+- Resolve company/position/stage from request overrides, detected analysis values, then safe fallbacks
+
+### Chunk 2 (analysis + linking behavior)
+
+- If analysis exists, force/link it to an application row
+- If analysis is missing, create a minimal manual analysis row and link it
+- Keep dedupe behavior by resolving through existing company+position application rows
+
+### Chunk 3 (verification)
+
+- Add unit/integration coverage for promote success, missing-analysis promotion, and idempotent re-promote
+- Run targeted and full pytest validation

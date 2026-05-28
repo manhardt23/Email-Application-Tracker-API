@@ -165,6 +165,18 @@ def test_emails_pagination(client, db):
     assert len(resp.json()) == 2
 
 
+@pytest.mark.integration
+def test_promote_email_to_application_flow(client, db):
+    email = _seed_email_with_analysis(db, message_id="promote-int-1", uid="promote-int-u1")
+
+    promote_resp = client.post(f"/api/v1/emails/{email.id}/promote", json={})
+    assert promote_resp.status_code == 200
+    payload = promote_resp.json()
+    assert payload["email_id"] == email.id
+    assert payload["application_id"] is not None
+    assert payload["company_name"] == "Integra Corp"
+
+
 # ---------------------------------------------------------------------------
 # Jobs flow
 # ---------------------------------------------------------------------------

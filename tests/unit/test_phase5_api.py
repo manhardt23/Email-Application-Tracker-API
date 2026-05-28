@@ -193,6 +193,62 @@ def test_list_emails_review_empty_when_none_need_review(client, db):
 
 
 # ---------------------------------------------------------------------------
+# POST /emails/{id}/promote
+# ---------------------------------------------------------------------------
+
+def test_promote_email_creates_application_from_analysis(client, db):
+    email = _seed_email_with_analysis(db, message_id="promote-1", uid="promote-u1")
+
+    resp = client.post(f"/api/v1/emails/{email.id}/promote", json={})
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["email_id"] == email.id
+    assert payload["created"] is True
+    assert payload["company_name"] == "Acme"
+    assert payload["position"] == "Engineer"
+
+
+def test_promote_email_creates_analysis_when_missing(client, db):
+    email = Email(
+        message_id="promote-2",
+        uid="promote-u2",
+        sender="hr@example.com",
+        subject="Application update",
+        received_date=datetime(2024, 2, 1),
+        body="hello",
+    )
+    db.add(email)
+    db.commit()
+    db.refresh(email)
+
+    resp = client.post(f"/api/v1/emails/{email.id}/promote", json={})
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["created"] is True
+    assert payload["company_name"] == "Unknown Company"
+    assert payload["position"] == "Unknown Position"
+
+    analysis = db.query(EmailAnalysis).filter(EmailAnalysis.email_id == email.id).first()
+    assert analysis is not None
+    assert analysis.application_id is not None
+    assert analysis.is_application is True
+
+
+def test_promote_email_is_idempotent_for_existing_target(client, db):
+    email = _seed_email_with_analysis(db, message_id="promote-3", uid="promote-u3")
+
+    first = client.post(f"/api/v1/emails/{email.id}/promote", json={})
+    second = client.post(f"/api/v1/emails/{email.id}/promote", json={})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["application_id"] == second.json()["application_id"]
+    assert second.json()["created"] is False
+
+
+# ---------------------------------------------------------------------------
 # PUT /applications/{id}
 # ---------------------------------------------------------------------------
 
