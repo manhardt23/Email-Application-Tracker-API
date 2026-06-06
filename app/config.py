@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # Email / IMAP
     email_user: str
     email_pass: str
-    imap_server: str = "imap.comcast.net"
+    imap_server: str = "imap.gmail.com"
 
     # Worker knobs — tunable via env without code changes.
     # EMAIL_LIMIT is preserved for backward-compat; MAX_EMAILS_PER_RUN is preferred.
