@@ -1,251 +1,243 @@
-import { useQuery } from "@tanstack/react-query";
+import {
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-import { Card } from "../components/Card";
-import { type ApplicationStatusPoint, ApplicationStatusCard } from "../components/cards/ApplicationStatusCard";
-import { type ApplicationsOverTimePoint, ApplicationsOverTimeCard } from "../components/cards/ApplicationsOverTimeCard";
-import { type RecentApplicationRow, RecentApplicationsCard } from "../components/cards/RecentApplicationsCard";
-import { type TopCompany, TopCompaniesCard } from "../components/cards/TopCompaniesCard";
-import { api } from "../lib/api";
-import { getValidToken } from "../lib/auth";
+import { ErrorState } from "../components/ErrorState";
+import { PageHeader } from "../components/PageHeader";
+import { Card, CardHeader } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
+import { MetricCard } from "../components/ui/MetricCard";
+import { Skeleton } from "../components/ui/Skeleton";
+import { StatusBadge } from "../components/ui/StatusBadge";
+import { Table, Td, Th, Tr } from "../components/ui/Table";
+import {
+  useApplicationsOverTime,
+  useDashboardMetrics,
+  useRecentApplications,
+  useStatusBreakdown,
+  useTopCompanies,
+} from "../hooks/useDashboard";
 
-type Kpi = {
-  label: string;
-  value: string;
-  trend: string;
-  trendClass: string;
-};
-
-type DashboardData = {
-  kpis: Kpi[];
-  applicationsOverTime: ApplicationsOverTimePoint[];
-  recentApplications: RecentApplicationRow[];
-  applicationStatus: ApplicationStatusPoint[];
-  topCompanies: TopCompany[];
-};
-
-const FALLBACK_DASHBOARD_DATA: DashboardData = {
-  kpis: [
-    { label: "Total Applications", value: "32", trend: "+8 this week", trendClass: "text-emerald-600" },
-    { label: "Responses Received", value: "14", trend: "+3 this week", trendClass: "text-emerald-600" },
-    { label: "Interviews Scheduled", value: "7", trend: "+1 this week", trendClass: "text-emerald-600" },
-    { label: "Response Rate", value: "43%", trend: "-2% from last week", trendClass: "text-rose-600" },
-  ],
-  applicationsOverTime: [
-    { week: "Wk 1", applications: 6 },
-    { week: "Wk 2", applications: 8 },
-    { week: "Wk 3", applications: 7 },
-    { week: "Wk 4", applications: 10 },
-    { week: "Wk 5", applications: 9 },
-    { week: "Wk 6", applications: 12 },
-  ],
-  recentApplications: [
-    { company: "Stripe", role: "Software Engineer", status: "Interview", dateApplied: "2026-05-20" },
-    { company: "Notion", role: "Backend Engineer", status: "Applied", dateApplied: "2026-05-18" },
-    { company: "Figma", role: "Platform Engineer", status: "Offer", dateApplied: "2026-05-14" },
-    { company: "Datadog", role: "Full Stack Engineer", status: "Rejected", dateApplied: "2026-05-12" },
-    { company: "Vercel", role: "Frontend Engineer", status: "Applied", dateApplied: "2026-05-10" },
-  ],
-  applicationStatus: [
-    { name: "Applied", value: 18, color: "#6366f1" },
-    { name: "Interview", value: 7, color: "#14b8a6" },
-    { name: "Offer", value: 2, color: "#f59e0b" },
-    { name: "Rejected", value: 5, color: "#f43f5e" },
-  ],
-  topCompanies: [
-    { company: "Stripe", applications: 4 },
-    { company: "Notion", applications: 3 },
-    { company: "Figma", applications: 2 },
-    { company: "Datadog", applications: 2 },
-    { company: "Vercel", applications: 1 },
-  ],
-};
-
-type DashboardMetricsResponse = {
-  total_applications: number;
-  responses_received: number;
-  interviews_scheduled: number;
-  response_rate: number;
-};
-
-type DashboardTrendResponse = {
-  day: string;
-  label: string;
-  applications: number;
-};
-
-type DashboardStatusResponse = {
-  name: "Applied" | "Interview" | "Offer" | "Rejected";
-  value: number;
-};
-
-type DashboardRecentResponse = {
-  company: string;
-  role: string;
-  status: RecentApplicationRow["status"];
-  date_applied: string;
-};
-
-function toLiveDashboardData(payload: {
-  metrics: DashboardMetricsResponse;
-  trend: DashboardTrendResponse[];
-  status: DashboardStatusResponse[];
-  recent: DashboardRecentResponse[];
-  topCompanies: TopCompany[];
-}): DashboardData {
-  const kpis: Kpi[] = [
-    {
-      label: "Total Applications",
-      value: String(payload.metrics.total_applications),
-      trend: "Live aggregate",
-      trendClass: "text-emerald-600",
-    },
-    {
-      label: "Responses Received",
-      value: String(payload.metrics.responses_received),
-      trend: "Live aggregate",
-      trendClass: "text-emerald-600",
-    },
-    {
-      label: "Interviews Scheduled",
-      value: String(payload.metrics.interviews_scheduled),
-      trend: "Live aggregate",
-      trendClass: "text-emerald-600",
-    },
-    {
-      label: "Response Rate",
-      value: `${payload.metrics.response_rate}%`,
-      trend: "Calculated from API",
-      trendClass: "text-slate-500",
-    },
-  ];
-
-  const applicationsOverTime: ApplicationsOverTimePoint[] = payload.trend.map((point) => ({
-    week: point.label,
-    applications: point.applications,
-  }));
-
-  const applicationStatus: ApplicationStatusPoint[] = payload.status.map((item) => ({
-    ...item,
-    color:
-      item.name === "Applied"
-        ? "#6366f1"
-        : item.name === "Interview"
-          ? "#14b8a6"
-          : item.name === "Offer"
-            ? "#f59e0b"
-            : "#f43f5e",
-  }));
-
-  const recentApplications: RecentApplicationRow[] = payload.recent.map((row) => ({
-    company: row.company,
-    role: row.role,
-    status: row.status,
-    dateApplied: row.date_applied,
-  }));
-
-  return {
-    kpis,
-    applicationsOverTime,
-    recentApplications,
-    applicationStatus,
-    topCompanies: payload.topCompanies,
-  };
-}
+const DONUT_COLORS = ["#4f46e5", "#a8a29e", "#d6d3d1", "#78716c"];
 
 export function Dashboard() {
-  const isAuthenticated = Boolean(getValidToken());
-  const dashboardQuery = useQuery({
-    queryKey: ["dashboard-live-data"],
-    enabled: isAuthenticated,
-    queryFn: async () => {
-      const [metricsResponse, trendResponse, statusResponse, recentResponse, topCompaniesResponse] = await Promise.all([
-        api.get<DashboardMetricsResponse>("/dashboard/metrics"),
-        api.get<DashboardTrendResponse[]>("/dashboard/applications-over-time", { params: { days: 30 } }),
-        api.get<DashboardStatusResponse[]>("/dashboard/status-breakdown"),
-        api.get<DashboardRecentResponse[]>("/dashboard/recent-applications", { params: { limit: 8 } }),
-        api.get<TopCompany[]>("/dashboard/top-companies", { params: { limit: 5 } }),
-      ]);
-      return toLiveDashboardData({
-        metrics: metricsResponse.data,
-        trend: trendResponse.data,
-        status: statusResponse.data,
-        recent: recentResponse.data,
-        topCompanies: topCompaniesResponse.data,
-      });
-    },
-  });
-
-  const dashboardData = dashboardQuery.data ?? FALLBACK_DASHBOARD_DATA;
-  const isUsingLiveData = Boolean(isAuthenticated && dashboardQuery.data);
+  const metrics = useDashboardMetrics();
+  const overTime = useApplicationsOverTime(30);
+  const breakdown = useStatusBreakdown();
+  const recent = useRecentApplications(8);
+  const topCompanies = useTopCompanies(5);
 
   return (
-    <section className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">Email Application Tracker</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Track applications, monitor responses, and visualize your job search.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              isUsingLiveData ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {isUsingLiveData ? "Live data" : "Demo data"}
-          </span>
-          <button
-            type="button"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            Export
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
-          >
-            + Add Application
-          </button>
-        </div>
-      </header>
+    <>
+      <PageHeader title="Dashboard" subtitle="Overview of your job search pipeline" />
 
-      {isAuthenticated && dashboardQuery.isLoading ? (
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
+        {metrics.isError ? (
+          <div className="col-span-2 md:col-span-4">
+            <ErrorState error={metrics.error} onRetry={() => metrics.refetch()} />
+          </div>
+        ) : (
+          <>
+            <MetricCard
+              label="Total applications"
+              value={metrics.data?.total_applications ?? 0}
+              loading={metrics.isLoading}
+            />
+            <MetricCard
+              label="Responses received"
+              value={metrics.data?.responses_received ?? 0}
+              loading={metrics.isLoading}
+            />
+            <MetricCard
+              label="Interviews scheduled"
+              value={metrics.data?.interviews_scheduled ?? 0}
+              loading={metrics.isLoading}
+            />
+            <MetricCard
+              label="Response rate"
+              value={metrics.data?.response_rate ?? 0}
+              suffix="%"
+              loading={metrics.isLoading}
+            />
+          </>
+        )}
+      </div>
+
+      {/* Chart + donut */}
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-[1.4fr_1fr]">
         <Card>
-          <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            Loading live dashboard data...
-          </p>
+          <CardHeader title="Applications over time" />
+          {overTime.isLoading ? (
+            <Skeleton className="h-[180px] w-full" />
+          ) : overTime.isError ? (
+            <ErrorState error={overTime.error} onRetry={() => overTime.refetch()} />
+          ) : (
+            <div style={{ minHeight: 180 }}>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={overTime.data ?? []} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid stroke="#e7e5e4" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "#8a8580" }}
+                    interval="preserveStartEnd"
+                    minTickGap={28}
+                    axisLine={{ stroke: "#d6d3d1" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: "#8a8580" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 6,
+                      border: "1px solid #d6d3d1",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="applications"
+                    stroke="#4f46e5"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </Card>
-      ) : null}
 
-      {isAuthenticated && dashboardQuery.isError ? (
         <Card>
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-            Live dashboard data is unavailable for this account right now. Showing demo data instead.
-          </p>
+          <CardHeader title="Status breakdown" />
+          {breakdown.isLoading ? (
+            <Skeleton className="h-[180px] w-full" />
+          ) : breakdown.isError ? (
+            <ErrorState error={breakdown.error} onRetry={() => breakdown.refetch()} />
+          ) : (breakdown.data ?? []).every((s) => s.value === 0) ? (
+            <EmptyState title="No applications yet." description="Status breakdown appears once you have applications." />
+          ) : (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width="50%" height={150}>
+                <PieChart>
+                  <Pie
+                    data={breakdown.data ?? []}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="55%"
+                    outerRadius="90%"
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {(breakdown.data ?? []).map((_, i) => (
+                      <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 6, border: "1px solid #d6d3d1", fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <ul className="flex-1 space-y-1.5">
+                {(breakdown.data ?? []).map((s, i) => (
+                  <li key={s.name} className="flex items-center gap-2 text-[13px] text-text-2">
+                    <span
+                      className="inline-block size-2.5 rounded-sm"
+                      style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }}
+                      aria-hidden
+                    />
+                    <span className="flex-1">{s.name}</span>
+                    <span className="font-mono text-text">{s.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Card>
-      ) : null}
+      </div>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {dashboardData.kpis.map((kpi) => (
-          <Card key={kpi.label}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{kpi.label}</p>
-            <p className="mt-3 text-3xl font-bold text-slate-900">{kpi.value}</p>
-            <p className={`mt-2 text-xs font-medium ${kpi.trendClass}`}>{kpi.trend}</p>
-          </Card>
-        ))}
-      </section>
+      {/* Recent + top companies */}
+      <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-[1.4fr_1fr]">
+        <Card>
+          <CardHeader title="Recent applications" />
+          {recent.isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : recent.isError ? (
+            <ErrorState error={recent.error} onRetry={() => recent.refetch()} />
+          ) : (recent.data ?? []).length === 0 ? (
+            <EmptyState title="No applications yet." description="Promote an email or trigger a check to populate this list." />
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Company</Th>
+                  <Th>Role</Th>
+                  <Th>Status</Th>
+                  <Th>Applied</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {(recent.data ?? []).map((r, i) => (
+                  <Tr key={i}>
+                    <Td className="font-medium text-text">{r.company}</Td>
+                    <Td>{r.role}</Td>
+                    <Td>
+                      <StatusBadge stage={r.status} />
+                    </Td>
+                    <Td className="font-mono text-text-3">{r.date_applied}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <ApplicationsOverTimeCard data={dashboardData.applicationsOverTime} />
-          <RecentApplicationsCard rows={dashboardData.recentApplications} />
-        </div>
-        <div className="space-y-4">
-          <ApplicationStatusCard data={dashboardData.applicationStatus} />
-          <TopCompaniesCard companies={dashboardData.topCompanies} />
-        </div>
-      </section>
-    </section>
+        <Card>
+          <CardHeader title="Top companies" />
+          {topCompanies.isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : topCompanies.isError ? (
+            <ErrorState error={topCompanies.error} onRetry={() => topCompanies.refetch()} />
+          ) : (topCompanies.data ?? []).length === 0 ? (
+            <EmptyState title="No companies yet." />
+          ) : (
+            <BarList data={topCompanies.data ?? []} />
+          )}
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function BarList({ data }: { data: { company: string; applications: number }[] }) {
+  const max = Math.max(...data.map((d) => d.applications), 1);
+  return (
+    <ul className="space-y-2.5">
+      {data.map((d) => (
+        <li key={d.company}>
+          <div className="mb-1 flex items-center justify-between text-[13px]">
+            <span className="truncate text-text-2">{d.company}</span>
+            <span className="ml-2 font-mono text-text-3">{d.applications}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-sm bg-fill">
+            <div
+              className="h-full rounded-sm bg-accent"
+              style={{ width: `${(d.applications / max) * 100}%` }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
