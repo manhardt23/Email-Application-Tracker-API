@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AdminUser, get_db
 from app.db.models import Application, Company
+from app.services.follow_up_service import FollowUpService
 
 router = APIRouter()
 
@@ -141,3 +142,13 @@ def get_top_companies(
         .all()
     )
     return [{"company": company_name, "applications": int(count)} for company_name, count in rows]
+
+
+@router.get("/follow-ups")
+def get_follow_ups(
+    db: DbDep,
+    _user: AdminUser,
+    stale_after_days: int = Query(default=14, ge=1, le=365),
+    limit: int = Query(default=8, ge=1, le=50),
+):
+    return FollowUpService(db).get_dashboard(stale_after_days=stale_after_days, limit=limit)

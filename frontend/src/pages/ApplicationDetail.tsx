@@ -26,7 +26,16 @@ export function ApplicationDetail() {
   const emails = useApplicationEmails(appId);
   const update = useUpdateApplication(appId);
 
-  const [form, setForm] = useState({ stage: "", company_name: "", position: "", notes: "" });
+  const [form, setForm] = useState({
+    stage: "",
+    company_name: "",
+    position: "",
+    notes: "",
+    contact_name: "",
+    contact_title: "",
+    contact_linkedin_url: "",
+    next_event_at: "",
+  });
 
   useEffect(() => {
     if (query.data) {
@@ -35,6 +44,10 @@ export function ApplicationDetail() {
         company_name: query.data.company?.name ?? "",
         position: query.data.position ?? "",
         notes: query.data.notes ?? "",
+        contact_name: query.data.contact_name ?? "",
+        contact_title: query.data.contact_title ?? "",
+        contact_linkedin_url: query.data.contact_linkedin_url ?? "",
+        next_event_at: toDatetimeLocalValue(query.data.next_event_at),
       });
     }
   }, [query.data]);
@@ -47,6 +60,14 @@ export function ApplicationDetail() {
     if (form.company_name.trim() !== (original.company?.name ?? "")) body.company_name = form.company_name.trim();
     if (form.position.trim() !== original.position) body.position = form.position.trim();
     if ((form.notes ?? "") !== (original.notes ?? "")) body.notes = form.notes;
+    if (form.contact_name.trim() !== (original.contact_name ?? "")) body.contact_name = form.contact_name.trim() || null;
+    if (form.contact_title.trim() !== (original.contact_title ?? "")) body.contact_title = form.contact_title.trim() || null;
+    if (form.contact_linkedin_url.trim() !== (original.contact_linkedin_url ?? "")) {
+      body.contact_linkedin_url = form.contact_linkedin_url.trim() || null;
+    }
+    const nextEventIso = fromDatetimeLocalValue(form.next_event_at);
+    const originalNextEvent = original.next_event_at ?? null;
+    if (nextEventIso !== originalNextEvent) body.next_event_at = nextEventIso;
     if (Object.keys(body).length === 0) {
       toast({ tone: "info", message: "No changes to save." });
       return;
@@ -148,6 +169,38 @@ export function ApplicationDetail() {
               placeholder="Add context, recruiter contacts, next steps…"
             />
 
+            <span className="text-text-3">Contact name</span>
+            <Input
+              id="contact_name"
+              value={form.contact_name}
+              onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))}
+              placeholder="Recruiter or hiring manager"
+            />
+
+            <span className="text-text-3">Contact title</span>
+            <Input
+              id="contact_title"
+              value={form.contact_title}
+              onChange={(e) => setForm((f) => ({ ...f, contact_title: e.target.value }))}
+              placeholder="Technical Recruiter"
+            />
+
+            <span className="text-text-3">LinkedIn URL</span>
+            <Input
+              id="contact_linkedin_url"
+              value={form.contact_linkedin_url}
+              onChange={(e) => setForm((f) => ({ ...f, contact_linkedin_url: e.target.value }))}
+              placeholder="https://www.linkedin.com/in/…"
+            />
+
+            <span className="text-text-3">Next event</span>
+            <Input
+              id="next_event_at"
+              type="datetime-local"
+              value={form.next_event_at}
+              onChange={(e) => setForm((f) => ({ ...f, next_event_at: e.target.value }))}
+            />
+
             <span className="text-text-3">Applied</span>
             <span className="font-mono text-text-2">{formatDate(app.applied_date)}</span>
 
@@ -193,4 +246,19 @@ export function ApplicationDetail() {
       </div>
     </>
   );
+}
+
+function toDatetimeLocalValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromDatetimeLocalValue(value: string): string | null {
+  if (!value.trim()) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
 }

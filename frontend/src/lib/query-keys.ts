@@ -11,6 +11,8 @@ export const queryKeys = {
     statusBreakdown: ["dashboard", "status-breakdown"] as const,
     recent: ["dashboard", "recent-applications"] as const,
     topCompanies: ["dashboard", "top-companies"] as const,
+    followUps: (staleAfterDays: number, limit: number) =>
+      ["dashboard", "follow-ups", staleAfterDays, limit] as const,
   },
   applications: {
     all: ["applications"] as const,

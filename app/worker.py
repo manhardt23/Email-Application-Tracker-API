@@ -41,6 +41,7 @@ from app.email_client.client import get_latest_uid, get_uid_received_date
 from app.llm.base import EmailClassification
 from app.llm.factory import build_classifier
 from app.services.email_service import EmailProcessor
+from app.services.follow_up_service import FollowUpService
 from app.services.worker_runtime import get_effective_max_emails
 
 # ---------------------------------------------------------------------------
@@ -326,6 +327,7 @@ def run(
                     application = app_repo.find_or_create(company.id, position_name)
                     analysis_repo.link_to_application(analysis, application.id)
                     app_repo.update_stage(application, email_data.stage, email_data.date)
+                    FollowUpService(session).recompute_last_contact_at(application)
 
             session.commit()
             saved += 1

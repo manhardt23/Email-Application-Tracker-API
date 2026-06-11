@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Annotated
 
@@ -10,6 +11,7 @@ from app.auth.dependencies import AdminUser, get_db
 from app.db.models import EmailAnalysis
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
+from app.services.follow_up_service import FOLLOW_UP_SNOOZED, FollowUpService, local_today
 
 router = APIRouter()
 
@@ -19,11 +21,19 @@ DbDep = Annotated[Session, Depends(get_db)]
 
 class StageEnum(StrEnum):
     applied = "applied"
+    screening = "screening"
     rejected = "rejected"
     interview = "interview"
     offer = "offer"
     assessment = "assessment"
+    no_response = "no_response"
     other = "other"
+
+
+class FollowUpStatusEnum(StrEnum):
+    open = "open"
+    snoozed = "snoozed"
+    muted = "muted"
 
 
 class ApplicationUpdate(BaseModel):
@@ -31,6 +41,19 @@ class ApplicationUpdate(BaseModel):
     notes: str | None = None
     company_name: str | None = None
     position: str | None = None
+    contact_name: str | None = None
+    contact_title: str | None = None
+    contact_linkedin_url: str | None = None
+    next_event_at: datetime | None = None
+    follow_up_status: FollowUpStatusEnum | None = None
+
+
+class FollowedUpRequest(BaseModel):
+    note: str | None = None
+
+
+class SnoozeRequest(BaseModel):
+    until: date
 
 
 @router.get("")
@@ -73,6 +96,42 @@ def list_application_emails(application_id: int, db: DbDep, _user: AdminUser):
     return [flatten_email(e) for e in emails]
 
 
+@router.post("/{application_id}/followed-up")
+def mark_application_followed_up(
+    application_id: int,
+    body: FollowedUpRequest,
+    db: DbDep,
+    _user: AdminUser,
+):
+    repo = ApplicationRepository(db)
+    application = repo.get_by_id(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    FollowUpService(db).mark_followed_up(application, body.note)
+    db.commit()
+    db.refresh(application)
+    return application
+
+
+@router.post("/{application_id}/snooze")
+def snooze_application_follow_up(
+    application_id: int,
+    body: SnoozeRequest,
+    db: DbDep,
+    _user: AdminUser,
+):
+    if body.until < local_today():
+        raise HTTPException(status_code=422, detail="until must be today or later")
+    repo = ApplicationRepository(db)
+    application = repo.get_by_id(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    FollowUpService(db).snooze(application, body.until)
+    db.commit()
+    db.refresh(application)
+    return application
+
+
 @router.put("/{application_id}")
 def update_application(application_id: int, body: ApplicationUpdate, db: DbDep, _user: AdminUser):
     repo = ApplicationRepository(db)
@@ -109,6 +168,22 @@ def update_application(application_id: int, body: ApplicationUpdate, db: DbDep, 
                 status_code=409,
                 detail="An application already exists for that company and position",
             )
+
+    if "contact_name" in body.model_fields_set:
+        application.contact_name = body.contact_name
+    if "contact_title" in body.model_fields_set:
+        application.contact_title = body.contact_title
+    if "contact_linkedin_url" in body.model_fields_set:
+        application.contact_linkedin_url = body.contact_linkedin_url
+    if "next_event_at" in body.model_fields_set:
+        application.next_event_at = body.next_event_at
+    if "follow_up_status" in body.model_fields_set:
+        if body.follow_up_status is None:
+            raise HTTPException(status_code=422, detail="follow_up_status cannot be null")
+        application.follow_up_status = body.follow_up_status.value
+        if body.follow_up_status.value != FOLLOW_UP_SNOOZED:
+            application.snoozed_until = None
+
     db.commit()
     db.refresh(application)
     return application

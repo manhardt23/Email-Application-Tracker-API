@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { FollowUpsPanel } from "../components/FollowUpsPanel";
 import { ErrorState } from "../components/ErrorState";
 import { PageHeader } from "../components/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
@@ -24,8 +25,8 @@ import {
   useDashboardMetrics,
   useRecentApplications,
   useStatusBreakdown,
-  useTopCompanies,
 } from "../hooks/useDashboard";
+import { useFollowUps } from "../hooks/useFollowUps";
 
 const DONUT_COLORS = ["#4f46e5", "#a8a29e", "#d6d3d1", "#78716c"];
 
@@ -34,7 +35,7 @@ export function Dashboard() {
   const overTime = useApplicationsOverTime(30);
   const breakdown = useStatusBreakdown();
   const recent = useRecentApplications(8);
-  const topCompanies = useTopCompanies(5);
+  const followUps = useFollowUps();
 
   return (
     <>
@@ -167,7 +168,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent + top companies */}
+      {/* Recent + follow-ups */}
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-[1.4fr_1fr]">
         <Card>
           <CardHeader title="Recent applications" />
@@ -203,41 +204,8 @@ export function Dashboard() {
           )}
         </Card>
 
-        <Card>
-          <CardHeader title="Top companies" />
-          {topCompanies.isLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : topCompanies.isError ? (
-            <ErrorState error={topCompanies.error} onRetry={() => topCompanies.refetch()} />
-          ) : (topCompanies.data ?? []).length === 0 ? (
-            <EmptyState title="No companies yet." />
-          ) : (
-            <BarList data={topCompanies.data ?? []} />
-          )}
-        </Card>
+        <FollowUpsPanel query={followUps} />
       </div>
     </>
-  );
-}
-
-function BarList({ data }: { data: { company: string; applications: number }[] }) {
-  const max = Math.max(...data.map((d) => d.applications), 1);
-  return (
-    <ul className="space-y-2.5">
-      {data.map((d) => (
-        <li key={d.company}>
-          <div className="mb-1 flex items-center justify-between text-[13px]">
-            <span className="truncate text-text-2">{d.company}</span>
-            <span className="ml-2 font-mono text-text-3">{d.applications}</span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-sm bg-fill">
-            <div
-              className="h-full rounded-sm bg-accent"
-              style={{ width: `${(d.applications / max) * 100}%` }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
   );
 }

@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -59,6 +60,13 @@ class Application(Base):
         nullable=False,
     )
     notes = Column(Text)
+    last_contact_at = Column(DateTime(timezone=True), nullable=True)
+    follow_up_status = Column(String(20), default="open", nullable=False)
+    snoozed_until = Column(Date, nullable=True)
+    next_event_at = Column(DateTime(timezone=True), nullable=True)
+    contact_name = Column(Text, nullable=True)
+    contact_title = Column(Text, nullable=True)
+    contact_linkedin_url = Column(Text, nullable=True)
 
     company = relationship("Company", back_populates="applications")
     analyses = relationship(

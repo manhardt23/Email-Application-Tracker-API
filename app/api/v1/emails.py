@@ -10,6 +10,7 @@ from app.db.repositories.analysis_repo import AnalysisRepository
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.llm.base import EmailClassification
+from app.services.follow_up_service import FollowUpService
 
 router = APIRouter()
 
@@ -159,6 +160,7 @@ def promote_email_to_application(
             analysis.detected_stage = stage_value
 
     analysis_repo.link_to_application(analysis, application.id)
+    FollowUpService(db).recompute_last_contact_at(application)
     db.commit()
     db.refresh(application)
 

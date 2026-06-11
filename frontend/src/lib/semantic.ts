@@ -21,10 +21,12 @@ const STATUS: Record<string, Swatch> = {
 
 export const STAGE_OPTIONS = [
   "applied",
+  "screening",
   "interview",
   "assessment",
   "offer",
   "rejected",
+  "no_response",
   "other",
 ] as const;
 

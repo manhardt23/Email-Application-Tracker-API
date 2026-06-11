@@ -7,7 +7,7 @@ Uses shared conftest fixtures.
 """
 
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from app.db.models import Application, Company, Email, EmailAnalysis, WorkerRun
 
@@ -326,3 +326,68 @@ def test_dashboard_top_companies_returns_ranked_counts(client, db):
     assert len(payload) == 2
     assert payload[0]["company"] == "B Corp"
     assert payload[0]["applications"] == 2
+
+
+def test_dashboard_follow_ups_returns_contract(client, db):
+    app = _seed_application_with_dates(
+        db,
+        stage="applied",
+        company_name="Stale Corp",
+        applied_days_ago=30,
+        updated_days_ago=30,
+    )
+    app.last_contact_at = datetime.now(UTC) - timedelta(days=20)
+    app.follow_up_status = "open"
+    db.commit()
+
+    resp = client.get("/api/v1/dashboard/follow-ups?stale_after_days=14&limit=5")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert "generated_at" in payload
+    assert payload["config"]["stale_after_days"] == 14
+    assert "counts" in payload
+    assert any(item["application_id"] == app.id for item in payload["stalled"])
+
+
+def test_application_followed_up_and_snooze(client, db):
+    app = _seed_application_with_dates(
+        db,
+        stage="applied",
+        company_name="Follow Co",
+        applied_days_ago=30,
+        updated_days_ago=30,
+    )
+    app.last_contact_at = datetime.now(UTC) - timedelta(days=20)
+    db.commit()
+
+    followed = client.post(f"/api/v1/applications/{app.id}/followed-up", json={"note": "Pinged"})
+    assert followed.status_code == 200
+    assert followed.json()["follow_up_status"] == "open"
+    assert "Pinged" in (followed.json().get("notes") or "")
+
+    snooze = client.post(
+        f"/api/v1/applications/{app.id}/snooze",
+        json={"until": (date.today() + timedelta(days=7)).isoformat()},
+    )
+    assert snooze.status_code == 200
+    assert snooze.json()["follow_up_status"] == "snoozed"
+
+
+def test_application_put_accepts_follow_up_contact_fields(client, db):
+    app = _seed_application(db, company_name="Contact Co")
+    resp = client.put(
+        f"/api/v1/applications/{app.id}",
+        json={
+            "contact_name": "Jordan Lee",
+            "contact_title": "Recruiter",
+            "contact_linkedin_url": "https://www.linkedin.com/in/example",
+            "next_event_at": (datetime.now(UTC) + timedelta(days=2)).isoformat(),
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["contact_name"] == "Jordan Lee"
+    assert body["contact_title"] == "Recruiter"
+    assert body["contact_linkedin_url"].endswith("/example")
+    assert body["next_event_at"] is not None

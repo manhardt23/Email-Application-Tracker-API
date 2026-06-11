@@ -57,6 +57,51 @@ export type TopCompany = {
   applications: number;
 };
 
+export type FollowUpConfig = {
+  stale_after_days: number;
+  overdue_after_days: number;
+  upcoming_window_days: number;
+};
+
+export type FollowUpUpcomingItem = {
+  application_id: number;
+  company: string;
+  role: string;
+  status: string;
+  event_at: string;
+  in_days: number;
+};
+
+export type FollowUpStalledItem = {
+  application_id: number;
+  company: string;
+  role: string;
+  status: string;
+  last_contact_at: string;
+  days_since_contact: number;
+  urgency: "due" | "overdue";
+  has_contact: boolean;
+  contact: {
+    name: string | null;
+    title: string | null;
+    linkedin_url: string | null;
+  };
+  linkedin_search_url: string;
+  suggested_message: string;
+};
+
+export type FollowUpsResponse = {
+  generated_at: string;
+  config: FollowUpConfig;
+  counts: {
+    stalled: number;
+    upcoming: number;
+    needs_contact: number;
+  };
+  upcoming: FollowUpUpcomingItem[];
+  stalled: FollowUpStalledItem[];
+};
+
 // --- Applications ---
 
 export type Company = {
@@ -73,6 +118,13 @@ export type Application = {
   applied_date: string;
   last_updated: string;
   notes?: string | null;
+  last_contact_at?: string | null;
+  follow_up_status?: string | null;
+  snoozed_until?: string | null;
+  next_event_at?: string | null;
+  contact_name?: string | null;
+  contact_title?: string | null;
+  contact_linkedin_url?: string | null;
   company?: Company | null;
 };
 
@@ -81,6 +133,11 @@ export type ApplicationUpdate = {
   notes?: string | null;
   company_name?: string;
   position?: string;
+  contact_name?: string | null;
+  contact_title?: string | null;
+  contact_linkedin_url?: string | null;
+  next_event_at?: string | null;
+  follow_up_status?: "open" | "snoozed" | "muted";
 };
 
 // --- Emails ---

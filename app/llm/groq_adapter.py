@@ -32,7 +32,7 @@ Body: {body}
 Return ONLY valid JSON with no explanation:
 {{
     "is_application": boolean,
-    "stage": "applied|rejected|interview|offer|assessment|other or null",
+    "stage": "applied|screening|rejected|interview|offer|assessment|no_response|other or null",
     "company": "string or null",
     "position": "string or null",
     "confidence": "high|medium|low"

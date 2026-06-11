@@ -5,6 +5,7 @@ from sqlalchemy.orm import joinedload
 
 from app.db.models import Application, Company
 from app.db.repositories.base import BaseRepository
+from app.services.follow_up_service import FollowUpService
 
 
 def _with_company(query):
@@ -78,6 +79,7 @@ class ApplicationRepository(BaseRepository):
             application = Application(company_id=company_id, position=position, stage="applied")
             self.session.add(application)
             self.session.flush()
+            FollowUpService(self.session).recompute_last_contact_at(application)
         return application
 
     def update_stage(

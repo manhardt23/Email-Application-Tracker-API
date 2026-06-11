@@ -890,10 +890,10 @@ app/
 
 ## Phase 31 Breakdown (manageable chunks)
 
-**Phase:** 31 — Follow-ups backend  
+**Phase:** 31 — Follow-ups (backend + frontend)  
 **Branch:** `phase31-follow-ups-backend` (from `main`)  
 **Already done:** Dashboard aggregate endpoints, applications CRUD, email linking; spec in `followUp.json` + `design.json` (FollowUpsPanel)  
-**This phase delivers:** DB columns, staleness detection, LinkedIn staging URLs, message templates, and the follow-up API surface for the dashboard panel.
+**This phase delivers:** DB columns, staleness detection, LinkedIn staging URLs, message templates, follow-up API surface, dashboard FollowUpsPanel, and application detail contact fields. Stages: `screening`, `no_response`.
 
 ### Chunk 0 (phase bootstrap)
 
@@ -932,4 +932,5 @@ app/
 
 - Unit tests: staleness rules, snooze expiry, urgency, message template, LinkedIn URL encoding
 - API tests: follow-ups list shape, followed-up/snooze, PUT new fields
-- Run `pytest` + `ruff check` on touched files
+- Frontend: FollowUpsPanel on dashboard, contact fields on application detail
+- Run `pytest` + `ruff check` + frontend build on touched files
