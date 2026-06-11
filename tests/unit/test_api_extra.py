@@ -77,14 +77,17 @@ def test_list_applications_returns_all(client, db):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 2
-    names = {item["company"]["name"] for item in data}
+    assert data["total"] == 2
+    names = {item["company"]["name"] for item in data["items"]}
     assert names == {"A Corp", "B Corp"}
 
 
-def test_list_applications_empty_returns_404(client):
+def test_list_applications_empty_returns_200_empty_envelope(client):
     resp = client.get("/api/v1/applications")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 def test_list_applications_filter_by_stage(client, db):
@@ -95,8 +98,8 @@ def test_list_applications_filter_by_stage(client, db):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1
-    assert data[0]["stage"] == "offer"
+    assert data["total"] == 1
+    assert data["items"][0]["stage"] == "offer"
 
 
 def test_list_applications_filter_by_stage_not_found(client, db):
@@ -104,8 +107,32 @@ def test_list_applications_filter_by_stage_not_found(client, db):
 
     resp = client.get("/api/v1/applications?stage=offer")
 
-    assert resp.status_code == 404
-    assert "offer" in resp.json()["detail"]
+    assert resp.status_code == 200
+    assert resp.json()["items"] == []
+
+
+def test_list_applications_search_by_company_or_position(client, db):
+    _seed_application(db, stage="applied", company_name="Acme Robotics")
+    _seed_application(db, stage="applied", company_name="Globex")
+
+    resp = client.get("/api/v1/applications?q=acme")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["items"][0]["company"]["name"] == "Acme Robotics"
+
+
+def test_list_applications_pagination_limits_items_not_total(client, db):
+    for i in range(3):
+        _seed_application(db, stage="applied", company_name=f"Corp {i}")
+
+    resp = client.get("/api/v1/applications?limit=2&offset=0")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 3
 
 
 # ---------------------------------------------------------------------------

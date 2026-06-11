@@ -26,7 +26,7 @@ class EmailPromoteRequest(BaseModel):
     stage: str | None = None
 
 
-def _flatten(email: Email) -> dict:
+def flatten_email(email: Email) -> dict:
     a: EmailAnalysis | None = email.analysis
     return {
         "id": email.id,
@@ -42,6 +42,7 @@ def _flatten(email: Email) -> dict:
         "detected_stage": a.detected_stage if a else None,
         "confidence": a.confidence if a else None,
         "needs_review": a.needs_review if a else None,
+        "application_id": a.application_id if a else None,
     }
 
 
@@ -52,6 +53,7 @@ def list_emails(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
+    total = db.query(Email).count()
     emails = (
         db.query(Email)
         .options(joinedload(Email.analysis))
@@ -60,7 +62,12 @@ def list_emails(
         .offset(offset)
         .all()
     )
-    return [_flatten(e) for e in emails]
+    return {
+        "items": [flatten_email(e) for e in emails],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/review")
@@ -79,7 +86,7 @@ def list_emails_for_review(
         .offset(offset)
         .all()
     )
-    return [_flatten(a.email) for a in analyses]
+    return [flatten_email(a.email) for a in analyses]
 
 
 @router.post("/{email_id}/promote")
@@ -163,3 +170,22 @@ def promote_email_to_application(
         "position": application.position,
         "stage": application.stage,
     }
+
+
+@router.post("/{email_id}/dismiss")
+def dismiss_email_from_review(email_id: int, db: DbDep, _user: AdminUser):
+    """Clear an email's needs_review flag so it leaves the review queue."""
+    email = (
+        db.query(Email)
+        .options(joinedload(Email.analysis))
+        .filter(Email.id == email_id)
+        .first()
+    )
+    if email is None:
+        raise HTTPException(status_code=404, detail="Email not found")
+    if email.analysis is None:
+        raise HTTPException(status_code=404, detail="Email has no analysis to dismiss")
+    email.analysis.needs_review = False
+    db.commit()
+    db.refresh(email)
+    return flatten_email(email)

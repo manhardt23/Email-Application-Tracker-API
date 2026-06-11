@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
-from app.db.models import Application
+from app.db.models import Application, Company
 from app.db.repositories.base import BaseRepository
 
 
@@ -28,6 +28,39 @@ class ApplicationRepository(BaseRepository):
             .filter(Application.stage == stage)
             .all()
         )
+
+    def search(
+        self,
+        stage: str | None = None,
+        q: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[Application], int]:
+        """Filter by stage and/or a search term (company name or position),
+        returning a page of results plus the total match count for pagination.
+        Uses ``.has()`` for the company match so it does not collide with the
+        joinedload of the same relationship."""
+        filters = []
+        if stage:
+            filters.append(Application.stage == stage)
+        term = (q or "").strip()
+        if term:
+            like = f"%{term.lower()}%"
+            filters.append(
+                or_(
+                    Application.company.has(func.lower(Company.name).like(like)),
+                    func.lower(Application.position).like(like),
+                )
+            )
+        total = self.session.query(Application).filter(*filters).count()
+        items = (
+            _with_company(self.session.query(Application).filter(*filters))
+            .order_by(Application.applied_date.desc(), Application.id.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+        return items, total
 
     def find_by_company_and_position(self, company_id: int, position: str) -> Application | None:
         return (

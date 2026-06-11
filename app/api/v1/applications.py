@@ -1,11 +1,13 @@
 from enum import StrEnum
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from app.api.v1.emails import flatten_email
 from app.auth.dependencies import AdminUser, get_db
+from app.db.models import EmailAnalysis
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 
@@ -32,13 +34,18 @@ class ApplicationUpdate(BaseModel):
 
 
 @router.get("")
-def list_applications(db: DbDep, _user: AdminUser, stage: str | None = None):
-    repo = ApplicationRepository(db)
-    results = repo.get_by_stage(stage) if stage else repo.get_all()
-    if not results:
-        detail = f"No applications found with stage '{stage}'" if stage else "No applications found"
-        raise HTTPException(status_code=404, detail=detail)
-    return results
+def list_applications(
+    db: DbDep,
+    _user: AdminUser,
+    stage: str | None = None,
+    q: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    items, total = ApplicationRepository(db).search(
+        stage=stage, q=q, limit=limit, offset=offset
+    )
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{application_id}")
@@ -47,6 +54,23 @@ def get_application(application_id: int, db: DbDep, _user: AdminUser):
     if not result:
         raise HTTPException(status_code=404, detail="Application not found")
     return result
+
+
+@router.get("/{application_id}/emails")
+def list_application_emails(application_id: int, db: DbDep, _user: AdminUser):
+    """Emails linked to this application, newest first — powers the detail timeline."""
+    application = ApplicationRepository(db).get_by_id(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    analyses = (
+        db.query(EmailAnalysis)
+        .options(joinedload(EmailAnalysis.email))
+        .filter(EmailAnalysis.application_id == application_id)
+        .all()
+    )
+    emails = [a.email for a in analyses if a.email is not None]
+    emails.sort(key=lambda e: e.received_date, reverse=True)
+    return [flatten_email(e) for e in emails]
 
 
 @router.put("/{application_id}")
