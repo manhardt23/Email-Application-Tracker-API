@@ -139,25 +139,31 @@ def test_list_emails_returns_flat_response(client, db):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1
-    row = data[0]
+    assert data["total"] == 1
+    assert len(data["items"]) == 1
+    row = data["items"][0]
     assert row["sender"] == "hr@example.com"
     assert row["is_application"] is True
     assert row["detected_company"] == "Acme"
     assert row["needs_review"] is False
+    assert "application_id" in row
 
 
 def test_list_emails_empty_returns_200(client):
     resp = client.get("/api/v1/emails")
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 def test_list_emails_empty_page_high_offset_returns_200(client, db):
     _seed_email_with_analysis(db)
     resp = client.get("/api/v1/emails?limit=10&offset=100")
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 1
 
 
 def test_list_emails_respects_limit(client, db):
@@ -166,7 +172,9 @@ def test_list_emails_respects_limit(client, db):
 
     resp = client.get("/api/v1/emails?limit=2&offset=0")
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 3
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +254,65 @@ def test_promote_email_is_idempotent_for_existing_target(client, db):
     assert second.status_code == 200
     assert first.json()["application_id"] == second.json()["application_id"]
     assert second.json()["created"] is False
+
+
+# ---------------------------------------------------------------------------
+# POST /emails/{id}/dismiss
+# ---------------------------------------------------------------------------
+
+def test_dismiss_email_clears_needs_review(client, db):
+    email = _seed_email_with_analysis(db, needs_review=True, message_id="d1", uid="d-u1")
+
+    resp = client.post(f"/api/v1/emails/{email.id}/dismiss")
+
+    assert resp.status_code == 200
+    assert resp.json()["needs_review"] is False
+    review = client.get("/api/v1/emails/review")
+    assert review.json() == []
+
+
+def test_dismiss_email_404_for_missing(client):
+    resp = client.post("/api/v1/emails/9999/dismiss")
+    assert resp.status_code == 404
+
+
+def test_dismiss_email_404_when_no_analysis(client, db):
+    email = Email(
+        message_id="d2",
+        uid="d-u2",
+        sender="hr@example.com",
+        subject="No analysis",
+        received_date=datetime(2024, 1, 1),
+        body="x",
+    )
+    db.add(email)
+    db.commit()
+    db.refresh(email)
+
+    resp = client.post(f"/api/v1/emails/{email.id}/dismiss")
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET /applications/{id}/emails
+# ---------------------------------------------------------------------------
+
+def test_list_application_emails_returns_linked(client, db):
+    email = _seed_email_with_analysis(db, message_id="link-1", uid="link-u1")
+    promote = client.post(f"/api/v1/emails/{email.id}/promote", json={})
+    app_id = promote.json()["application_id"]
+
+    resp = client.get(f"/api/v1/applications/{app_id}/emails")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == email.id
+
+
+def test_list_application_emails_404_for_missing_application(client):
+    resp = client.get("/api/v1/applications/9999/emails")
+    assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -409,6 +476,30 @@ def test_get_job_status_returns_run_fields(client, db):
     assert data["emails_fetched"] == 5
     assert data["emails_saved"] == 3
     assert data["applications_found"] == 2
+
+
+def test_list_jobs_returns_recent_runs(client, db):
+    db.add_all(
+        [
+            WorkerRun(status="completed", emails_fetched=4, emails_saved=2, applications_found=1),
+            WorkerRun(status="failed", error_message="boom"),
+        ]
+    )
+    db.commit()
+
+    resp = client.get("/api/v1/jobs")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+    assert {row["status"] for row in data} == {"completed", "failed"}
+    assert all("job_id" in row for row in data)
+
+
+def test_list_jobs_empty_returns_empty_list(client):
+    resp = client.get("/api/v1/jobs")
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 def test_get_job_status_404_for_missing(client):

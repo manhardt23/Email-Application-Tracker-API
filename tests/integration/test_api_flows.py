@@ -83,7 +83,7 @@ def test_application_lifecycle(client, db):
     # list
     list_resp = client.get("/api/v1/applications")
     assert list_resp.status_code == 200
-    assert len(list_resp.json()) == 1
+    assert len(list_resp.json()["items"]) == 1
 
     # get single
     get_resp = client.get(f"/api/v1/applications/{app.id}")
@@ -108,7 +108,7 @@ def test_list_applications_stage_filter(client, db):
 
     resp = client.get("/api/v1/applications?stage=offer")
     assert resp.status_code == 200
-    assert all(a["stage"] == "offer" for a in resp.json())
+    assert all(a["stage"] == "offer" for a in resp.json()["items"])
 
 
 @pytest.mark.integration
@@ -147,7 +147,7 @@ def test_emails_list_and_review(client, db):
 
     list_resp = client.get("/api/v1/emails")
     assert list_resp.status_code == 200
-    assert len(list_resp.json()) == 2
+    assert len(list_resp.json()["items"]) == 2
 
     review_resp = client.get("/api/v1/emails/review")
     assert review_resp.status_code == 200
@@ -162,7 +162,7 @@ def test_emails_pagination(client, db):
 
     resp = client.get("/api/v1/emails?limit=2&offset=0")
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert len(resp.json()["items"]) == 2
 
 
 @pytest.mark.integration

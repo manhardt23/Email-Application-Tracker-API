@@ -2,11 +2,12 @@ import traceback
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AdminUser, get_db
+from app.db.models import WorkerRun
 from app.db.repositories.worker_run_repo import WorkerRunRepository
 from app.services.worker_runtime import set_max_emails_override
 
@@ -14,6 +15,19 @@ router = APIRouter()
 
 
 DbDep = Annotated[Session, Depends(get_db)]
+
+
+def _serialize_run(run: WorkerRun) -> dict:
+    return {
+        "job_id": str(run.id),
+        "status": run.status,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "emails_fetched": run.emails_fetched,
+        "emails_saved": run.emails_saved,
+        "applications_found": run.applications_found,
+        "error_message": run.error_message,
+    }
 
 
 class WorkerEmailLimitUpdate(BaseModel):
@@ -95,6 +109,13 @@ def set_worker_email_limit(body: WorkerEmailLimitUpdate, _user: AdminUser):
     return {"max_emails_per_run": override, "source": "in_memory_override"}
 
 
+@router.get("")
+def list_jobs(db: DbDep, _user: AdminUser, limit: int = Query(20, ge=1, le=100)):
+    """Recent worker runs, newest first — powers the Jobs & workers history table."""
+    runs = WorkerRunRepository(db).get_recent(limit)
+    return [_serialize_run(r) for r in runs]
+
+
 @router.get("/{job_id}")
 def get_job_status(job_id: str, db: DbDep, _user: AdminUser):
     try:
@@ -104,13 +125,4 @@ def get_job_status(job_id: str, db: DbDep, _user: AdminUser):
     run = WorkerRunRepository(db).get_by_id(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {
-        "job_id": str(run.id),
-        "status": run.status,
-        "started_at": run.started_at,
-        "finished_at": run.finished_at,
-        "emails_fetched": run.emails_fetched,
-        "emails_saved": run.emails_saved,
-        "applications_found": run.applications_found,
-        "error_message": run.error_message,
-    }
+    return _serialize_run(run)
