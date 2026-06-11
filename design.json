@@ -1,0 +1,446 @@
+{
+  "meta": {
+    "name": "Email Application Tracker — Design System",
+    "version": "1.0.0",
+    "description": "Design tokens, component specs, and page blueprints for the Email Application Tracker frontend. Derived from the approved low-fidelity wireframe and leveled up to a production system. Built to be consumed by an AI coding agent (Cursor).",
+    "targetStack": {
+      "framework": "React 18 + TypeScript",
+      "bundler": "Vite",
+      "styling": "CSS variables (generate :root from cssVariables block) OR Tailwind (map tokens into theme.extend)",
+      "dataFetching": "TanStack Query (React Query) against the FastAPI backend",
+      "routing": "react-router-dom",
+      "charts": "recharts",
+      "icons": "lucide-react"
+    },
+    "apiBaseUrl": "/api/v1",
+    "note": "GET /stats is served at the site root (/stats), every other endpoint is under /api/v1."
+  },
+
+  "designIntent": {
+    "feel": "Calm, dense-but-legible enterprise tooling. Neutral stone foundation with a single indigo accent reserved for interactive intent. Flat surfaces defined by hairline borders rather than heavy shadows.",
+    "principles": [
+      "Restraint: color is information, not decoration. Spend it on actions, focus, and status only.",
+      "Hairline structure: separate regions with 1px stone borders and whitespace, not drop shadows. Shadows appear only on overlay surfaces (drawer).",
+      "Monospace = machine data. Use the mono family for IDs, timestamps, API paths, and code so they read as data at a glance.",
+      "One bold element per view. Everything else stays quiet.",
+      "Every empty/loading/error state is designed, never a blank panel."
+    ],
+    "doNot": [
+      "No gradients on surfaces or buttons.",
+      "No shadows on cards/metrics/tables; borders only.",
+      "No more than one solid high-contrast button per section.",
+      "Do not invent new accent hues; statuses use the defined semantic palette."
+    ]
+  },
+
+  "tokens": {
+    "color": {
+      "neutralScale": {
+        "description": "Tailwind 'stone' scale. The product's structural foundation.",
+        "50": "#fafaf9",
+        "100": "#f5f5f4",
+        "200": "#e7e5e4",
+        "300": "#d6d3d1",
+        "400": "#a8a29e",
+        "500": "#78716c",
+        "600": "#57534e",
+        "700": "#44403c",
+        "800": "#292524",
+        "900": "#1c1917"
+      },
+      "primaryScale": {
+        "description": "Indigo. The single interactive accent: focus rings, links, selected states, active chart series, progress.",
+        "50": "#eef2ff",
+        "100": "#e0e7ff",
+        "200": "#c7d2fe",
+        "500": "#6366f1",
+        "600": "#4f46e5",
+        "700": "#4338ca"
+      },
+      "semanticAliases": {
+        "description": "Aliases that components reference. Map these to CSS variables.",
+        "surfacePage": "#f4f4f3",
+        "surfaceRaised": "#ffffff",
+        "surfaceSunken": "#efedec",
+        "surfaceFill": "#e7e5e4",
+        "border": "#d6d3d1",
+        "borderStrong": "#a8a29e",
+        "textPrimary": "#1c1917",
+        "textSecondary": "#57534e",
+        "textMuted": "#8a8580",
+        "textOnInverse": "#ffffff",
+        "inverseSurface": "#1c1917",
+        "accent": "#4f46e5",
+        "accentHover": "#4338ca",
+        "accentSubtle": "#eef2ff",
+        "focusRing": "#4f46e5"
+      },
+      "feedback": {
+        "successFg": "#15803d", "successBg": "#eefcf2", "successBorder": "#bbf7d0",
+        "warningFg": "#b45309", "warningBg": "#fff7ea", "warningBorder": "#fde68a",
+        "dangerFg": "#b91c1c", "dangerBg": "#fef2f2", "dangerBorder": "#fecaca",
+        "infoFg": "#1d4ed8", "infoBg": "#eff4ff", "infoBorder": "#bfdbfe"
+      }
+    },
+
+    "typography": {
+      "fontFamily": {
+        "sans": "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        "mono": "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+      },
+      "rootFontSize": "15px",
+      "scale": {
+        "eyebrow":   { "size": "11px", "weight": 600, "letterSpacing": "0.12em", "transform": "uppercase", "use": "section eyebrows, sidebar group labels" },
+        "caption":   { "size": "11px", "weight": 600, "letterSpacing": "0.04em", "transform": "uppercase", "use": "table column headers (th)" },
+        "meta":      { "size": "12px", "weight": 400, "lineHeight": 1.5, "use": "hints, secondary metadata, pill text" },
+        "bodySm":    { "size": "13px", "weight": 400, "lineHeight": 1.5, "use": "table cells, form controls, nav items, buttons" },
+        "body":      { "size": "15px", "weight": 400, "lineHeight": 1.55, "use": "default body" },
+        "sectionTitle": { "size": "13px", "weight": 600, "use": "card/section headers" },
+        "titleSm":   { "size": "16px", "weight": 600, "use": "drawer / modal titles" },
+        "titleMd":   { "size": "18px", "weight": 600, "use": "login heading" },
+        "pageTitle": { "size": "21px", "weight": 600, "letterSpacing": "-0.02em", "use": "page H1" },
+        "metric":    { "size": "26px", "weight": 600, "letterSpacing": "-0.02em", "use": "metric card numbers" }
+      },
+      "weights": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700 }
+    },
+
+    "spacing": {
+      "description": "px scale. Use these for padding, gap, and margins.",
+      "0": "0px", "0.5": "2px", "1": "4px", "1.5": "6px", "2": "8px", "2.5": "10px",
+      "3": "12px", "3.5": "14px", "4": "16px", "4.5": "18px", "5": "20px", "5.5": "22px",
+      "6": "26px", "8": "32px", "10": "40px", "15": "60px"
+    },
+
+    "radius": {
+      "sm": "3px",   "comment_sm": "bars, small tags, status pill chips",
+      "md": "6px",   "comment_md": "cards, buttons, inputs, selects (default)",
+      "lg": "10px",  "comment_lg": "login card, modal panels",
+      "full": "999px", "comment_full": "filter pills, status badges, avatar"
+    },
+
+    "borderWidth": { "thin": "1px", "medium": "1.5px", "comment": "1.5px for dashed chart frames and brand glyph" },
+
+    "elevation": {
+      "flat": "none",
+      "comment_flat": "Default for cards, metrics, tables — borders only.",
+      "drawer": "-14px 0 44px rgba(0,0,0,0.08)",
+      "popover": "0 8px 28px rgba(0,0,0,0.10)"
+    },
+
+    "zIndex": { "base": 0, "stickyTopbar": 10, "backdrop": 40, "drawer": 50, "toast": 60 },
+
+    "motion": {
+      "durationFast": "150ms",
+      "durationBase": "200ms",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "drawerTransform": "transform 200ms cubic-bezier(0.4,0,0.2,1)",
+      "respectReducedMotion": true
+    },
+
+    "breakpoints": {
+      "sm": "640px",
+      "md": "820px",
+      "comment_md": "Below this the sidebar collapses to an off-canvas drawer and multi-column grids stack to one column.",
+      "contentMaxWidth": "1080px"
+    }
+  },
+
+  "cssVariables": {
+    "comment": "Paste-ready :root block. Generate this from tokens. Components below reference these names.",
+    "--color-page": "#f4f4f3",
+    "--color-surface": "#ffffff",
+    "--color-sunken": "#efedec",
+    "--color-fill": "#e7e5e4",
+    "--color-line": "#d6d3d1",
+    "--color-line-strong": "#a8a29e",
+    "--color-text": "#1c1917",
+    "--color-text-2": "#57534e",
+    "--color-text-3": "#8a8580",
+    "--color-inverse": "#1c1917",
+    "--color-on-inverse": "#ffffff",
+    "--color-accent": "#4f46e5",
+    "--color-accent-hover": "#4338ca",
+    "--color-accent-subtle": "#eef2ff",
+    "--radius-sm": "3px",
+    "--radius-md": "6px",
+    "--radius-lg": "10px",
+    "--radius-full": "999px",
+    "--space-2": "8px",
+    "--space-3": "12px",
+    "--space-4": "16px",
+    "--space-5": "20px",
+    "--space-6": "26px",
+    "--font-sans": "'Inter', ui-sans-serif, system-ui, sans-serif",
+    "--font-mono": "'JetBrains Mono', ui-monospace, Menlo, monospace",
+    "--shadow-drawer": "-14px 0 44px rgba(0,0,0,0.08)",
+    "--z-topbar": "10",
+    "--z-backdrop": "40",
+    "--z-drawer": "50",
+    "--z-toast": "60"
+  },
+
+  "semantic": {
+    "applicationStatus": {
+      "comment": "Status badge styling, keyed by application status. Use full radius pill.",
+      "applied":    { "label": "Applied",    "fg": "#57534e", "bg": "#f5f5f4", "border": "#d6d3d1" },
+      "screening":  { "label": "Screening",  "fg": "#1d4ed8", "bg": "#eff4ff", "border": "#bfdbfe" },
+      "interview":  { "label": "Interview",  "fg": "#4338ca", "bg": "#eef2ff", "border": "#c7d2fe" },
+      "offer":      { "label": "Offer",      "fg": "#15803d", "bg": "#eefcf2", "border": "#bbf7d0" },
+      "rejected":   { "label": "Rejected",   "fg": "#b91c1c", "bg": "#fef2f2", "border": "#fecaca" },
+      "no_response":{ "label": "No response","fg": "#8a8580", "bg": "#fafaf9", "border": "#e7e5e4" }
+    },
+    "emailClassification": {
+      "comment": "Tag styling for classifier output (Groq/Llama3).",
+      "interview_invite": { "label": "Interview invite", "fg": "#15803d", "bg": "#eefcf2" },
+      "acknowledgement":  { "label": "Acknowledgement",  "fg": "#1d4ed8", "bg": "#eff4ff" },
+      "offer":            { "label": "Offer",            "fg": "#15803d", "bg": "#eefcf2" },
+      "rejection":        { "label": "Rejection",        "fg": "#b91c1c", "bg": "#fef2f2" },
+      "needs_review":     { "label": "Needs review",     "fg": "#b45309", "bg": "#fff7ea" },
+      "not_relevant":     { "label": "Not relevant",     "fg": "#8a8580", "bg": "#fafaf9" }
+    }
+  },
+
+  "layout": {
+    "appShell": {
+      "structure": "Two-column grid: fixed sidebar + fluid main. Main contains a sticky topbar and a scrolling page region.",
+      "grid": "grid-template-columns: 220px 1fr; min-height: 100vh",
+      "sidebar": { "width": "220px", "background": "var(--color-surface)", "borderRight": "1px solid var(--color-line)", "padding": "18px 14px" },
+      "topbar": { "height": "54px", "position": "sticky", "top": 0, "zIndex": "var(--z-topbar)", "background": "var(--color-surface)", "borderBottom": "1px solid var(--color-line)", "padding": "0 22px" },
+      "page": { "padding": "26px", "paddingBottom": "60px", "maxWidth": "1080px" },
+      "responsive": "Below 820px: hide the static sidebar, expose it as an off-canvas drawer via a hamburger in the topbar; page padding drops to 16px."
+    },
+    "contentGrids": {
+      "metrics":     { "columns": "repeat(4, 1fr)", "gap": "14px", "mobile": "repeat(2, 1fr)" },
+      "splitWide":   { "columns": "1.4fr 1fr", "gap": "14px", "mobile": "1fr", "use": "chart + secondary panel" },
+      "splitEqual":  { "columns": "1fr 1fr", "gap": "14px", "mobile": "1fr" },
+      "detail":      { "columns": "1.5fr 1fr", "gap": "14px", "mobile": "1fr", "use": "application detail: form + activity" },
+      "jobControls": { "columns": "repeat(3, 1fr)", "gap": "14px", "mobile": "1fr" }
+    }
+  },
+
+  "components": {
+    "AppShell": { "role": "Layout wrapper", "composition": ["Sidebar", "Main(Topbar + Outlet)"], "notes": "Sidebar and Topbar persist across routes; only the page region swaps." },
+
+    "Sidebar": {
+      "contains": ["Brand", "primary NavItems", "group label 'Admin'", "admin NavItems", "spacer", "footer utility (e.g. settings)"],
+      "brand": { "glyph": "26px square, 1.5px border var(--color-text), radius 5px", "title": "14px semibold", "subtitle": "11px var(--color-text-3) — app version" }
+    },
+    "NavItem": {
+      "tag": "button or NavLink",
+      "base": "display:flex; gap:9px; padding:8px 9px; radius: var(--radius-md); font:13.5px; color: var(--color-text-2); leading icon 15px (lucide)",
+      "states": {
+        "hover": "background: var(--color-sunken); color: var(--color-text)",
+        "active": "background: var(--color-inverse); color: var(--color-on-inverse)"
+      },
+      "a11y": "aria-current='page' on active route."
+    },
+    "Topbar": { "contains": ["Breadcrumb (left)", "right cluster: HealthIndicator, Avatar"], "breadcrumb": "13px; trailing segment is current page in var(--color-text) semibold" },
+    "HealthIndicator": { "desc": "Status dot + label bound to GET /api/v1/health", "dot": "8px circle, success green #22c55e with 3px halo #dcfce7", "errorState": "danger red dot + 'API unreachable'" },
+    "Avatar": { "size": "30px circle", "border": "1px solid var(--color-line)", "bound": "GET /api/v1/auth/me", "menu": "click opens user menu with sign out" },
+
+    "PageHeader": { "structure": "title (pageTitle) + optional subtitle (meta, var(--color-text-3)) on the left; action buttons right-aligned", "marginBottom": "20px" },
+
+    "Card": { "base": "background: var(--color-surface); border:1px solid var(--color-line); radius: var(--radius-md); padding:16px; position:relative; elevation: flat" },
+    "MetricCard": { "extends": "Card", "content": "big number (metric, 26px semibold) + label (12px var(--color-text-3))", "bound": "GET /api/v1/dashboard/metrics" },
+
+    "Button": {
+      "base": "font:13px; radius: var(--radius-md); padding:7px 13px; border:1px solid; cursor:pointer; transition: background var(--duration-fast)",
+      "variants": {
+        "primary": "background: var(--color-inverse); color: var(--color-on-inverse); border-color: var(--color-inverse); hover: brightness(1.15)",
+        "secondary": "background: var(--color-surface); color: var(--color-text); border-color: var(--color-line-strong); hover: background var(--color-sunken)",
+        "ghost": "transparent; no border; color: var(--color-text-2); hover: background var(--color-sunken)",
+        "danger": "background: var(--color-surface); color: #b91c1c; border-color: #fecaca; hover: background #fef2f2"
+      },
+      "states": { "disabled": "opacity .5; cursor not-allowed", "loading": "show spinner, keep width, disable" },
+      "rule": "Max one primary per section."
+    },
+    "Input": { "base": "border:1px solid var(--color-line); radius: var(--radius-md); height:34px; padding:0 11px; font:13px; background: var(--color-surface)", "focus": "border-color: var(--color-accent); ring 2px var(--color-accent) offset 2px", "textarea": "min-height 64px; align text to top" },
+    "Select": { "base": "like Input with borderStrong; trailing chevron (lucide chevron-down); min-width 150px", "use": "status editing on detail + promote drawer" },
+    "FilterPill": { "base": "inline-flex; radius: var(--radius-full); padding:4px 11px; font:12px; border:1px solid var(--color-line); background: var(--color-surface); color: var(--color-text-2)", "states": { "active": "background var(--color-inverse); color var(--color-on-inverse); border-color var(--color-inverse)" }, "use": "status filters on Applications, classification filters on Emails" },
+    "Toolbar": { "desc": "Horizontal row: search Input (flex:1) + FilterPills / Select dropdowns", "gap": "10px", "wrap": true, "marginBottom": "16px" },
+
+    "Table": {
+      "th": "caption type (11px uppercase semibold var(--color-text-3)); padding 0 12px 10px; border-bottom 1px var(--color-line)",
+      "td": "padding 12px; border-bottom 1px var(--color-line); color var(--color-text-2); font 13px",
+      "rowClickable": "cursor pointer; hover background var(--color-sunken); first cell var(--color-text) medium",
+      "a11y": "Use real <table>/<thead>/<tbody>; if rows navigate, make the primary cell a real link for keyboard users.",
+      "footer": "results count (meta) left, Prev/Next secondary buttons right"
+    },
+    "StatusBadge": { "desc": "Pill keyed by semantic.applicationStatus", "base": "inline-block; font:11px; padding:3px 9px; radius: var(--radius-full); border:1px solid", "tokenSource": "semantic.applicationStatus" },
+    "ClassificationTag": { "desc": "Inline tag keyed by semantic.emailClassification", "tokenSource": "semantic.emailClassification" },
+
+    "ChartLineContainer": { "desc": "Card holding 'Applications over time' line chart", "implementation": "recharts LineChart; single series uses var(--color-accent); axes/grid in var(--color-line); minHeight 150px", "bound": "GET /api/v1/dashboard/applications-over-time", "wireframeNote": "Wireframe shows a dashed placeholder — replace with the live chart." },
+    "StatusDonut": { "desc": "Donut for status breakdown + legend", "implementation": "recharts PieChart innerRadius~50%; slices use neutralScale steps with one accent for the dominant; legend lists statuses", "bound": "GET /api/v1/dashboard/status-breakdown" },
+    "BarList": { "desc": "Horizontal ranked bars (top companies)", "implementation": "each row: label + proportional bar (var(--color-fill) track); width = value/max", "bound": "GET /api/v1/dashboard/top-companies" },
+    "Timeline": { "desc": "Vertical list of linked email events on application detail", "implementation": "left rail 1.5px var(--color-line); node 9px circle borderStrong; each item: subject + timestamp(mono meta)", "dataNote": "Emails linked to this application." },
+
+    "KeyValueList": { "desc": "Two-column label/value grid for detail + promote forms", "grid": "grid-template-columns: 120px 1fr; gap: 10px 14px; font 13px", "labelColor": "var(--color-text-3)" },
+
+    "Drawer": {
+      "desc": "Right-side slide-in panel. Primary surface for promoting an email to an application.",
+      "frame": "position:fixed; top:0; right:0; height:100vh; width:440px; max-width:92vw; background: var(--color-surface); border-left:1px solid var(--color-line); box-shadow: var(--shadow-drawer); z-index: var(--z-drawer)",
+      "animation": "transform translateX(100%) -> 0 over var(--duration-base)",
+      "regions": {
+        "head": "padding 18px 20px; border-bottom 1px line; title (titleSm) + endpoint context + close (×) button right",
+        "body": "padding 20px; overflow auto; flex:1",
+        "foot": "padding 14px 20px; border-top 1px line; Cancel (secondary) + confirm (primary), right-aligned"
+      },
+      "a11y": "role='dialog' aria-modal='true' aria-label; trap focus while open; Escape closes; restore focus to the trigger on close; backdrop click closes."
+    },
+    "Backdrop": { "desc": "Dim layer behind drawer/modal", "style": "position:fixed inset:0; background rgba(28,25,23,0.28); z-index: var(--z-backdrop); fade 180ms; pointer-events only when open" },
+    "EmailPreview": { "desc": "Read-only source-email block inside the promote drawer", "style": "border 1px line; radius md; padding 14px; background var(--color-sunken); shows from+date (meta), subject (medium), body snippet" },
+    "LabeledDivider": { "desc": "Horizontal rule with centered uppercase label (e.g. 'Creates application')", "style": "flex with two 1px line rules flanking eyebrow-type text" },
+    "ConfidenceBar": { "desc": "Classifier confidence meter on review cards", "style": "6px track var(--color-fill); fill var(--color-line-strong) (or warning fg when low); width = confidence%", "context": "Review queue items below a confidence threshold." },
+    "ReviewCard": { "extends": "Card", "layout": "grid 1fr auto: left = subject + sender(meta) + ConfidenceBar + classifier note; right = stacked 'Promote to application' (primary) + 'Dismiss' (secondary)", "bound": "GET /api/v1/emails/review; promote -> POST /api/v1/emails/{id}/promote" },
+
+    "EmptyState": { "desc": "Designed empty panel", "style": "1.5px dashed var(--color-line-strong); radius md; padding 30px; centered meta text + optional primary action", "copyRule": "State what's empty and the single next action, in the interface's voice (e.g. 'No emails to review. New low-confidence emails will appear here.')." },
+    "Toast": { "desc": "Transient confirmation, e.g. after promote", "style": "elevation popover; success border/bg from feedback; auto-dismiss ~4s; includes optional 'View application' link", "zIndex": "var(--z-toast)" },
+    "Pagination": { "desc": "Prev/Next secondary buttons + range meta", "note": "Bind to GET /api/v1/applications and /api/v1/emails paging params." }
+  },
+
+  "pages": [
+    {
+      "id": "login",
+      "route": "/login",
+      "title": "Sign in",
+      "layout": "Centered single Card (radius lg, width ~340px) on var(--color-page).",
+      "sections": [
+        { "component": "Brand glyph + title + subtitle" },
+        { "component": "Input (email)", "label": "Email" },
+        { "component": "Input (password)", "label": "Password" },
+        { "component": "Button.primary full-width", "label": "Sign in", "endpoint": "POST /api/v1/auth/login" }
+      ],
+      "behavior": "On success store token, fetch GET /api/v1/auth/me, redirect to /dashboard. On failure show inline error (danger) above the form — explain what to fix, no apology."
+    },
+    {
+      "id": "dashboard",
+      "route": "/",
+      "title": "Dashboard",
+      "subtitle": "Overview of your job search pipeline",
+      "layout": "metrics grid, then splitWide (line chart | donut), then splitWide (recent applications table | top companies BarList).",
+      "sections": [
+        { "component": "MetricCard x4", "endpoint": "GET /api/v1/dashboard/metrics" },
+        { "component": "ChartLineContainer", "endpoint": "GET /api/v1/dashboard/applications-over-time" },
+        { "component": "StatusDonut", "endpoint": "GET /api/v1/dashboard/status-breakdown" },
+        { "component": "Table (recent)", "endpoint": "GET /api/v1/dashboard/recent-applications", "behavior": "rows link to /applications/{id}" },
+        { "component": "BarList", "endpoint": "GET /api/v1/dashboard/top-companies" }
+      ]
+    },
+    {
+      "id": "applications",
+      "route": "/applications",
+      "title": "Applications",
+      "subtitle": "Every role you've applied to",
+      "layout": "Toolbar (search + status FilterPills) then a Card-wrapped Table with Pagination.",
+      "sections": [
+        { "component": "Toolbar (search + status filters)" },
+        { "component": "Table", "columns": ["Company", "Role", "Status (StatusBadge)", "Source", "Applied"], "endpoint": "GET /api/v1/applications", "behavior": "row click -> /applications/{id}" },
+        { "component": "Pagination" }
+      ]
+    },
+    {
+      "id": "applicationDetail",
+      "route": "/applications/:id",
+      "title": "{company} — {role}",
+      "subtitle": "Application #{id}",
+      "layout": "PageHeader with Back (secondary) + Save changes (primary); detail grid: editable form Card | linked email Timeline Card.",
+      "sections": [
+        { "component": "KeyValueList (editable: Status Select, Company, Role, Location, Source, Notes)", "endpoint": "GET /api/v1/applications/{id}" },
+        { "component": "Save changes Button.primary", "endpoint": "PUT /api/v1/applications/{id}" },
+        { "component": "Timeline (linked emails)", "dataNote": "Emails associated with this application." }
+      ]
+    },
+    {
+      "id": "emails",
+      "route": "/emails",
+      "title": "Emails",
+      "subtitle": "All ingested & classified messages",
+      "layout": "Toolbar (search + classification/linked filters) then Card-wrapped Table with a trailing action column.",
+      "sections": [
+        { "component": "Toolbar" },
+        { "component": "Table", "columns": ["From", "Subject", "Classification (ClassificationTag)", "Linked app", "Received", "Action"], "endpoint": "GET /api/v1/emails" },
+        { "component": "Action cell", "behavior": "If unlinked: 'Promote →' secondary button opens the promote Drawer. If linked: 'Linked' muted label that links to the application." }
+      ]
+    },
+    {
+      "id": "reviewQueue",
+      "route": "/review",
+      "title": "Review queue",
+      "subtitle": "Low-confidence classifications needing a human decision",
+      "layout": "Vertical stack of ReviewCards; EmptyState when none.",
+      "sections": [
+        { "component": "ReviewCard list", "endpoint": "GET /api/v1/emails/review" },
+        { "component": "Promote action", "behavior": "Opens the same promote Drawer", "endpoint": "POST /api/v1/emails/{id}/promote" }
+      ]
+    },
+    {
+      "id": "jobsAdmin",
+      "route": "/jobs",
+      "title": "Jobs & workers",
+      "subtitle": "Trigger ingestion runs and tune the worker",
+      "layout": "jobControls grid (3 action Cards), then splitEqual (recent jobs Table | system stats MetricCards).",
+      "sections": [
+        { "component": "Action Card: Check for new email", "endpoint": "POST /api/v1/jobs/email-check" },
+        { "component": "Action Card: Backfill history (date range)", "endpoint": "POST /api/v1/jobs/email-backfill" },
+        { "component": "Action Card: Worker email limit (number input)", "endpoint": "POST /api/v1/jobs/email-limit" },
+        { "component": "Table: recent jobs", "endpoint": "GET /api/v1/jobs/{id}", "behavior": "Poll running jobs (React Query refetchInterval) until terminal status." },
+        { "component": "MetricCards: system stats", "endpoint": "GET /stats" }
+      ]
+    }
+  ],
+
+  "promoteFlow": {
+    "summary": "The promote-email-to-application action is reachable from BOTH the Emails table (per-row 'Promote →') and the Review queue cards. Both open the same right-side Drawer so the user keeps their place in the list.",
+    "drawerContents": ["EmailPreview of the source message", "LabeledDivider 'Creates application'", "KeyValueList prefilled from classifier extraction: Company, Role, Status (Select), Source", "hint: fields are editable before promoting"],
+    "confirm": { "endpoint": "POST /api/v1/emails/{id}/promote", "onSuccess": "close drawer, show success Toast with 'View application' link, invalidate emails + applications + dashboard queries", "onError": "keep drawer open, show inline danger message" }
+  },
+
+  "api": {
+    "baseUrl": "/api/v1",
+    "endpoints": [
+      { "method": "GET",  "path": "/api/v1/health", "usedBy": ["topbar"], "purpose": "Service health for the status indicator." },
+      { "method": "POST", "path": "/api/v1/auth/login", "usedBy": ["login"], "purpose": "Authenticate, return token." },
+      { "method": "GET",  "path": "/api/v1/auth/me", "usedBy": ["topbar/avatar", "auth guard"], "purpose": "Current user." },
+      { "method": "GET",  "path": "/api/v1/applications", "usedBy": ["applications"], "purpose": "List with search/filter/paging." },
+      { "method": "GET",  "path": "/api/v1/applications/{id}", "usedBy": ["applicationDetail"], "purpose": "Single application." },
+      { "method": "PUT",  "path": "/api/v1/applications/{id}", "usedBy": ["applicationDetail"], "purpose": "Update fields / status." },
+      { "method": "GET",  "path": "/api/v1/dashboard/metrics", "usedBy": ["dashboard"], "purpose": "Headline metric cards." },
+      { "method": "GET",  "path": "/api/v1/dashboard/applications-over-time", "usedBy": ["dashboard"], "purpose": "Line chart series." },
+      { "method": "GET",  "path": "/api/v1/dashboard/status-breakdown", "usedBy": ["dashboard"], "purpose": "Donut data." },
+      { "method": "GET",  "path": "/api/v1/dashboard/recent-applications", "usedBy": ["dashboard"], "purpose": "Recent rows." },
+      { "method": "GET",  "path": "/api/v1/dashboard/top-companies", "usedBy": ["dashboard"], "purpose": "Ranked bar list." },
+      { "method": "GET",  "path": "/api/v1/emails", "usedBy": ["emails"], "purpose": "All ingested emails." },
+      { "method": "GET",  "path": "/api/v1/emails/review", "usedBy": ["reviewQueue"], "purpose": "Low-confidence queue." },
+      { "method": "POST", "path": "/api/v1/emails/{id}/promote", "usedBy": ["emails", "reviewQueue", "promoteFlow"], "purpose": "Create an application from an email." },
+      { "method": "POST", "path": "/api/v1/jobs/email-check", "usedBy": ["jobsAdmin"], "purpose": "Trigger incremental fetch." },
+      { "method": "POST", "path": "/api/v1/jobs/email-backfill", "usedBy": ["jobsAdmin"], "purpose": "Trigger historical backfill." },
+      { "method": "POST", "path": "/api/v1/jobs/email-limit", "usedBy": ["jobsAdmin"], "purpose": "Set worker per-run email limit." },
+      { "method": "GET",  "path": "/api/v1/jobs/{id}", "usedBy": ["jobsAdmin"], "purpose": "Poll job status." },
+      { "method": "GET",  "path": "/stats", "usedBy": ["jobsAdmin"], "purpose": "System-level stats (served at root)." }
+    ]
+  },
+
+  "accessibility": {
+    "focus": "Visible focus ring on all interactive elements: 2px solid var(--color-accent), offset 2px. Never remove outlines without a replacement.",
+    "color": "Maintain WCAG AA contrast (4.5:1 text). Status is never conveyed by color alone — always pair with a text label.",
+    "keyboard": "Full keyboard operability. Drawer traps focus, closes on Escape, restores focus to its trigger.",
+    "semantics": "Real <table>, <button> vs <a> by behavior, <label> tied to every input, aria-current on active nav, aria-live='polite' on toasts.",
+    "motion": "Honor prefers-reduced-motion: reduce — disable drawer/transition animations."
+  },
+
+  "implementationNotes": {
+    "tokenConsumption": "Generate the cssVariables block into a global :root in index.css, or map tokens into tailwind.config.ts theme.extend (colors, fontFamily, borderRadius, boxShadow, zIndex). Reference variables — do not hardcode hex in components.",
+    "suggestedStructure": [
+      "src/styles/tokens.css        (the :root variable block)",
+      "src/lib/api.ts               (fetch wrapper, attaches auth token)",
+      "src/hooks/                   (React Query hooks per endpoint, e.g. useApplications, useDashboardMetrics)",
+      "src/components/ui/           (Button, Input, Select, Card, Table, StatusBadge, Drawer, etc.)",
+      "src/components/             (composite: Sidebar, Topbar, MetricCard, ReviewCard, PromoteDrawer)",
+      "src/pages/                  (Login, Dashboard, Applications, ApplicationDetail, Emails, ReviewQueue, JobsAdmin)",
+      "src/App.tsx                 (router + AppShell)"
+    ],
+    "dataLayer": "One React Query hook per endpoint. Mutations (PUT application, promote email, job triggers) invalidate the relevant query keys: promote invalidates ['emails'], ['emails','review'], ['applications'], ['dashboard'].",
+    "statesContract": "Every data-bound section must implement three states: loading (skeleton matching the final layout — gray bars at token sizes), empty (designed EmptyState), error (inline danger message with a retry action). No raw spinners on full pages where a skeleton fits.",
+    "buildOrder": ["tokens + global styles", "ui primitives", "AppShell (Sidebar + Topbar)", "Dashboard", "Applications + Detail", "Emails", "PromoteDrawer (shared)", "ReviewQueue", "JobsAdmin"]
+  }
+}
