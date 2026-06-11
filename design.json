@@ -271,7 +271,7 @@
 
     "ChartLineContainer": { "desc": "Card holding 'Applications over time' line chart", "implementation": "recharts LineChart; single series uses var(--color-accent); axes/grid in var(--color-line); minHeight 150px", "bound": "GET /api/v1/dashboard/applications-over-time", "wireframeNote": "Wireframe shows a dashed placeholder — replace with the live chart." },
     "StatusDonut": { "desc": "Donut for status breakdown + legend", "implementation": "recharts PieChart innerRadius~50%; slices use neutralScale steps with one accent for the dominant; legend lists statuses", "bound": "GET /api/v1/dashboard/status-breakdown" },
-    "BarList": { "desc": "Horizontal ranked bars (top companies)", "implementation": "each row: label + proportional bar (var(--color-fill) track); width = value/max", "bound": "GET /api/v1/dashboard/top-companies" },
+    "FollowUpsPanel": { "desc": "Forward-looking action panel that replaces the top-companies bar list. Two groups: 'Coming up' (scheduled interviews/events) and 'Needs follow-up' (active applications gone quiet past the stale threshold).", "implementation": "Card with section header + count badge. Two stacked groups. Each follow-up row: company + role (cell-strong), a muted line 'Quiet {days}d · {status}', a small urgency dot (warning for 'due', danger for 'overdue'), and a trailing action Button.secondary that is 'Message {contact.name}' (opens contact.linkedin_url) when has_contact, else 'Find contact' (opens linkedin_search_url). Row overflow menu: 'Mark followed up', 'Snooze'. 'Coming up' rows show event_at relative ('in 2d'). Use EmptyState ('All caught up — no follow-ups due') when both groups are empty.", "bound": "GET /api/v1/dashboard/follow-ups", "writeActions": "POST /applications/{id}/followed-up, POST /applications/{id}/snooze, PUT /applications/{id} (save contact). Invalidate ['dashboard','follow-ups'] + ['applications'] on success.", "spec": "See followUp.json for the data model, detection logic, and endpoint contract." },
     "Timeline": { "desc": "Vertical list of linked email events on application detail", "implementation": "left rail 1.5px var(--color-line); node 9px circle borderStrong; each item: subject + timestamp(mono meta)", "dataNote": "Emails linked to this application." },
 
     "KeyValueList": { "desc": "Two-column label/value grid for detail + promote forms", "grid": "grid-template-columns: 120px 1fr; gap: 10px 14px; font 13px", "labelColor": "var(--color-text-3)" },
@@ -317,13 +317,13 @@
       "route": "/",
       "title": "Dashboard",
       "subtitle": "Overview of your job search pipeline",
-      "layout": "metrics grid, then splitWide (line chart | donut), then splitWide (recent applications table | top companies BarList).",
+      "layout": "metrics grid, then splitWide (line chart | donut), then splitWide (recent applications table | FollowUpsPanel).",
       "sections": [
         { "component": "MetricCard x4", "endpoint": "GET /api/v1/dashboard/metrics" },
         { "component": "ChartLineContainer", "endpoint": "GET /api/v1/dashboard/applications-over-time" },
         { "component": "StatusDonut", "endpoint": "GET /api/v1/dashboard/status-breakdown" },
         { "component": "Table (recent)", "endpoint": "GET /api/v1/dashboard/recent-applications", "behavior": "rows link to /applications/{id}" },
-        { "component": "BarList", "endpoint": "GET /api/v1/dashboard/top-companies" }
+        { "component": "FollowUpsPanel", "endpoint": "GET /api/v1/dashboard/follow-ups", "note": "Replaces the former top-companies bar list. Full backend contract in followUp.json." }
       ]
     },
     {
@@ -408,7 +408,10 @@
       { "method": "GET",  "path": "/api/v1/dashboard/applications-over-time", "usedBy": ["dashboard"], "purpose": "Line chart series." },
       { "method": "GET",  "path": "/api/v1/dashboard/status-breakdown", "usedBy": ["dashboard"], "purpose": "Donut data." },
       { "method": "GET",  "path": "/api/v1/dashboard/recent-applications", "usedBy": ["dashboard"], "purpose": "Recent rows." },
-      { "method": "GET",  "path": "/api/v1/dashboard/top-companies", "usedBy": ["dashboard"], "purpose": "Ranked bar list." },
+      { "method": "GET",  "path": "/api/v1/dashboard/top-companies", "usedBy": [], "purpose": "Ranked bar list. DEPRECATED on the dashboard — replaced by /dashboard/follow-ups; endpoint may remain for other uses." },
+      { "method": "GET",  "path": "/api/v1/dashboard/follow-ups", "usedBy": ["dashboard"], "purpose": "Stalled applications needing a nudge + upcoming events. Full contract in followUp.json." },
+      { "method": "POST", "path": "/api/v1/applications/{id}/followed-up", "usedBy": ["dashboard"], "purpose": "Record that you reached out; resets the stale clock." },
+      { "method": "POST", "path": "/api/v1/applications/{id}/snooze", "usedBy": ["dashboard"], "purpose": "Defer a follow-up until a date." },
       { "method": "GET",  "path": "/api/v1/emails", "usedBy": ["emails"], "purpose": "All ingested emails." },
       { "method": "GET",  "path": "/api/v1/emails/review", "usedBy": ["reviewQueue"], "purpose": "Low-confidence queue." },
       { "method": "POST", "path": "/api/v1/emails/{id}/promote", "usedBy": ["emails", "reviewQueue", "promoteFlow"], "purpose": "Create an application from an email." },

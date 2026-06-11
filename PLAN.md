@@ -887,3 +887,49 @@ app/
 
 - Add unit/integration coverage for promote success, missing-analysis promotion, and idempotent re-promote
 - Run targeted and full pytest validation
+
+## Phase 31 Breakdown (manageable chunks)
+
+**Phase:** 31 — Follow-ups backend  
+**Branch:** `phase31-follow-ups-backend` (from `main`)  
+**Already done:** Dashboard aggregate endpoints, applications CRUD, email linking; spec in `followUp.json` + `design.json` (FollowUpsPanel)  
+**This phase delivers:** DB columns, staleness detection, LinkedIn staging URLs, message templates, and the follow-up API surface for the dashboard panel.
+
+### Chunk 0 (phase bootstrap)
+
+- Branch from `main`: `phase31-follow-ups-backend`
+- Commit `followUp.json` and `design.json` follow-up panel updates as spec baseline
+
+### Chunk 1 (schema + migration)
+
+- Add nullable columns on `applications`: `last_contact_at`, `follow_up_status` (`open`/`snoozed`/`muted`), `snoozed_until`, `next_event_at`, `contact_name`, `contact_title`, `contact_linkedin_url`
+- Migration `004_follow_ups.sql` with backfill: `last_contact_at = MAX(applied_date, latest linked email received_date)`
+- Partial index on `(follow_up_status, last_contact_at)` for active stages
+
+### Chunk 2 (last_contact derivation service)
+
+- `FollowUpService` (or similar): recompute `last_contact_at` on application create, email link/promote, and `followed-up` action
+- Config constants: `stale_after_days=14`, `overdue_after_days=21`, `upcoming_window_days=5`, active/terminal stage lists
+- Map existing `stage` values to follow-up active set (`applied`, `interview`, `assessment` → screening where needed)
+
+### Chunk 3 (GET `/dashboard/follow-ups`)
+
+- Admin-only endpoint returning `generated_at`, `config`, `counts`, `upcoming[]`, `stalled[]` per `followUp.json`
+- Service layer: days_since, urgency (`due`/`overdue`), `has_contact`, LinkedIn search URL builder, resolved `suggested_message`
+- Query params: optional `stale_after_days`, `limit`
+
+### Chunk 4 (write endpoints)
+
+- `POST /applications/{id}/followed-up` — set `last_contact_at=now`, `follow_up_status=open`, optional note append
+- `POST /applications/{id}/snooze` — body `{ until: date }`, set snoozed
+- Extend `PUT /applications/{id}` to accept contact fields, `next_event_at`, `follow_up_status`
+
+### Chunk 5 (pipeline hooks)
+
+- Recompute `last_contact_at` when emails are linked to applications (promote + worker pipeline paths)
+
+### Chunk 6 (tests + verification)
+
+- Unit tests: staleness rules, snooze expiry, urgency, message template, LinkedIn URL encoding
+- API tests: follow-ups list shape, followed-up/snooze, PUT new fields
+- Run `pytest` + `ruff check` on touched files

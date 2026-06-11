@@ -1,0 +1,190 @@
+{
+  "meta": {
+    "feature": "Follow-ups",
+    "version": "1.0.0",
+    "purpose": "Surface active applications that have gone quiet past a threshold, plus upcoming scheduled events, and stage the real-world follow-up action (find/contact a human on LinkedIn) — because application emails are usually no-reply. Powers the dashboard FollowUpsPanel (see design.json).",
+    "scope": "Human-in-the-loop. No LinkedIn scraping, no third-party enrichment APIs. Contact details are user-entered and remembered per application. The tool detects WHEN to follow up and stages WHERE; the user confirms WHO once."
+  },
+
+  "dataModel": {
+    "comment": "New optional columns on the existing applications table. No new tables required.",
+    "applications.add": {
+      "last_contact_at":     { "type": "timestamptz", "nullable": true, "desc": "Most recent meaningful contact for this application. Drives staleness. See derivation." },
+      "follow_up_status":    { "type": "enum", "values": ["open", "snoozed", "muted"], "default": "open", "desc": "User override of the nudge. 'open' = eligible; 'snoozed' = hidden until snoozed_until; 'muted' = never nudge." },
+      "snoozed_until":       { "type": "date", "nullable": true, "desc": "When a snoozed item becomes eligible again." },
+      "next_event_at":       { "type": "timestamptz", "nullable": true, "desc": "Scheduled interview/call. Feeds the 'Coming up' group." },
+      "contact_name":        { "type": "text", "nullable": true },
+      "contact_title":       { "type": "text", "nullable": true, "desc": "e.g. 'Technical Recruiter'." },
+      "contact_linkedin_url":{ "type": "text", "nullable": true }
+    },
+    "indexes": ["partial index on (follow_up_status, last_contact_at) WHERE status in active_statuses — keeps the dashboard query cheap."]
+  },
+
+  "lastContactDerivation": {
+    "rule": "last_contact_at = MAX(applied_at, latest associated email timestamp, last manual 'followed-up' timestamp).",
+    "notes": [
+      "A no-reply confirmation email still counts as contact for timing purposes — it sets the clock, it just isn't a reply channel.",
+      "Recompute on: application create, email linked/promoted, and the followed-up action.",
+      "If never set, fall back to applied_at (or created_at)."
+    ]
+  },
+
+  "config": {
+    "comment": "Server-side, single source of truth for thresholds. Expose as settings later.",
+    "stale_after_days": 14,
+    "overdue_after_days": 21,
+    "upcoming_window_days": 5,
+    "active_statuses": ["applied", "screening", "interview"],
+    "terminal_statuses": ["offer", "rejected", "withdrawn", "no_response"],
+    "timezone": "user timezone if known, else server tz — do all day math in this tz",
+    "default_limit": 8
+  },
+
+  "detection": {
+    "stalled": {
+      "eligible_when_all": [
+        "application.status IN config.active_statuses",
+        "follow_up_status = 'open'  (exclude 'muted'; exclude 'snoozed' unless snoozed_until <= today)",
+        "days_since(last_contact_at) >= config.stale_after_days"
+      ],
+      "urgency": "days_since(last_contact_at) >= overdue_after_days -> 'overdue', else 'due'",
+      "order_by": ["urgency desc (overdue first)", "days_since_contact desc"],
+      "limit": "config.default_limit (override via ?limit)"
+    },
+    "upcoming": {
+      "eligible_when": "next_event_at IS NOT NULL AND next_event_at BETWEEN now AND now + upcoming_window_days",
+      "order_by": ["next_event_at asc"]
+    }
+  },
+
+  "linkedinStaging": {
+    "comment": "We never call LinkedIn. We only build a prefilled people-search URL the user opens in a new tab.",
+    "search_url_template": "https://www.linkedin.com/search/results/people/?keywords={company}%20recruiter",
+    "encode": "URL-encode {company}; collapse legal suffixes (Inc, LLC) for better matches.",
+    "when": "Returned per stalled item as linkedin_search_url. UI uses it for the 'Find contact' action when no contact is saved yet.",
+    "right_person_guidance_surfaced_to_user": [
+      "Prefer a warm connection at the company over a cold recruiter.",
+      "Then the recruiter named in the email signature / job posting.",
+      "Then a technical/eng recruiter currently at the company.",
+      "Verify: current employee + recruiting/TA-for-engineering title. Avoid wrong-function recruiters and stale profiles."
+    ]
+  },
+
+  "messageTemplate": {
+    "comment": "Suggested LinkedIn/connection note, returned resolved per item. Short, professional, editable by user.",
+    "template": "Hi {first_name}, I recently applied for the {role} role at {company} ({applied_relative}) and wanted to express my continued interest. I'd welcome the chance to connect and answer any questions about my background.",
+    "placeholders": {
+      "{first_name}": "contact_name first token, else 'there'",
+      "{role}": "application.role",
+      "{company}": "application.company",
+      "{applied_relative}": "humanized applied_at, e.g. 'about two weeks ago'"
+    }
+  },
+
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/follow-ups",
+      "auth": "required (owner)",
+      "query": {
+        "stale_after_days": "int, optional override of config",
+        "limit": "int, optional, caps stalled[]"
+      },
+      "response": {
+        "generated_at": "timestamptz",
+        "config": { "stale_after_days": 14, "overdue_after_days": 21, "upcoming_window_days": 5 },
+        "counts": { "stalled": "int", "upcoming": "int", "needs_contact": "int (stalled items with no saved contact)" },
+        "upcoming": [
+          {
+            "application_id": "uuid|int",
+            "company": "string",
+            "role": "string",
+            "status": "string",
+            "event_at": "timestamptz",
+            "in_days": "int"
+          }
+        ],
+        "stalled": [
+          {
+            "application_id": "uuid|int",
+            "company": "string",
+            "role": "string",
+            "status": "string (active status)",
+            "last_contact_at": "timestamptz",
+            "days_since_contact": "int",
+            "urgency": "due | overdue",
+            "has_contact": "bool",
+            "contact": { "name": "string|null", "title": "string|null", "linkedin_url": "string|null" },
+            "linkedin_search_url": "string (present when has_contact=false; may also be included as fallback)",
+            "suggested_message": "string (resolved template)"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/applications/{id}/followed-up",
+      "auth": "required (owner)",
+      "purpose": "Record an outreach. Sets last_contact_at = now and follow_up_status = 'open'. Removes the item from 'stalled' for another threshold window.",
+      "body": { "note": "string, optional" },
+      "response": "updated application"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/applications/{id}/snooze",
+      "auth": "required (owner)",
+      "purpose": "Defer a follow-up.",
+      "body": { "until": "date (required)" },
+      "effect": "follow_up_status = 'snoozed', snoozed_until = until",
+      "response": "updated application"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/applications/{id}",
+      "auth": "required (owner)",
+      "purpose": "Existing endpoint, extended to accept the new fields so a user can save a contact and an event time.",
+      "acceptsNewFields": ["contact_name", "contact_title", "contact_linkedin_url", "next_event_at", "follow_up_status"]
+    }
+  ],
+
+  "exampleResponse": {
+    "generated_at": "2026-06-11T14:02:00Z",
+    "config": { "stale_after_days": 14, "overdue_after_days": 21, "upcoming_window_days": 5 },
+    "counts": { "stalled": 2, "upcoming": 1, "needs_contact": 1 },
+    "upcoming": [
+      { "application_id": 4821, "company": "Viasat", "role": "Backend Engineer", "status": "interview", "event_at": "2026-06-13T16:00:00Z", "in_days": 2 }
+    ],
+    "stalled": [
+      {
+        "application_id": 4790, "company": "Lockheed Martin", "role": "Software Engineer", "status": "applied",
+        "last_contact_at": "2026-05-19T00:00:00Z", "days_since_contact": 23, "urgency": "overdue",
+        "has_contact": false, "contact": { "name": null, "title": null, "linkedin_url": null },
+        "linkedin_search_url": "https://www.linkedin.com/search/results/people/?keywords=Lockheed%20Martin%20recruiter",
+        "suggested_message": "Hi there, I recently applied for the Software Engineer role at Lockheed Martin (about three weeks ago) and wanted to express my continued interest..."
+      },
+      {
+        "application_id": 4801, "company": "IBM", "role": "Back End Developer", "status": "screening",
+        "last_contact_at": "2026-05-27T00:00:00Z", "days_since_contact": 15, "urgency": "due",
+        "has_contact": true, "contact": { "name": "Jordan Lee", "title": "Technical Recruiter", "linkedin_url": "https://www.linkedin.com/in/example" },
+        "linkedin_search_url": "https://www.linkedin.com/search/results/people/?keywords=IBM%20recruiter",
+        "suggested_message": "Hi Jordan, I recently applied for the Back End Developer role at IBM (about two weeks ago) and wanted to express my continued interest..."
+      }
+    ]
+  },
+
+  "edgeCases": [
+    "No saved contact -> has_contact=false; UI shows 'Find contact' using linkedin_search_url. Once saved via PUT, future responses set has_contact=true and the UI shows 'Message {name}'.",
+    "Snoozed items are excluded until snoozed_until passes; then they reappear as 'open'.",
+    "Terminal statuses (offer/rejected/withdrawn/no_response) are never stalled.",
+    "Application emails are typically no-reply: the follow-up channel is always external (LinkedIn/connection), never an email reply. last_contact_at uses the email only for timing.",
+    "Missing last_contact_at falls back to applied_at/created_at so nothing is silently invisible.",
+    "All day math uses the configured timezone to avoid off-by-one 'days since' near midnight."
+  ],
+
+  "implementationNotes": {
+    "query": "Single query over applications filtered by active status + follow_up_status + last_contact_at threshold, ordered server-side; compute days_since and urgency in the service layer; resolve suggested_message there too.",
+    "caching": "React Query key ['dashboard','follow-ups']; invalidate on followed-up / snooze / PUT application and after promote.",
+    "settings": "Keep thresholds in config now; promote to a user settings row later without changing the response shape.",
+    "migration": "Add the new nullable columns; backfill last_contact_at = MAX(applied_at, latest linked email) in the migration."
+  }
+}
