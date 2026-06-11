@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { ArrowRight, Search } from "lucide-react";
 
 import { ErrorState } from "../components/ErrorState";
@@ -34,10 +35,12 @@ export function Emails() {
   const [promoteEmail, setPromoteEmail] = useState<EmailRow | null>(null);
   const query = useEmails(offset);
 
+  const pageItems = useMemo(() => query.data?.items ?? [], [query.data]);
+  const total = query.data?.total ?? 0;
+
   const filtered = useMemo(() => {
-    const rows = query.data ?? [];
     const term = search.trim().toLowerCase();
-    return rows.filter((e) => {
+    return pageItems.filter((e) => {
       const matchesSearch =
         !term ||
         e.sender.toLowerCase().includes(term) ||
@@ -45,9 +48,9 @@ export function Emails() {
       const matchesClass = classFilter === "all" || classifyEmail(e).label === classFilter;
       return matchesSearch && matchesClass;
     });
-  }, [query.data, search, classFilter]);
+  }, [pageItems, search, classFilter]);
 
-  const pageFull = (query.data?.length ?? 0) === EMAILS_PAGE_SIZE;
+  const hasNextPage = offset + pageItems.length < total;
 
   return (
     <>
@@ -87,9 +90,9 @@ export function Emails() {
         ) : filtered.length === 0 ? (
           <div className="p-4">
             <EmptyState
-              title={query.data && query.data.length > 0 ? "No emails match these filters." : "No emails ingested yet."}
+              title={pageItems.length > 0 ? "No emails match these filters." : "No emails ingested yet."}
               description={
-                query.data && query.data.length > 0
+                pageItems.length > 0
                   ? "Adjust search or classification filters."
                   : "Trigger an email check from Jobs & workers to ingest messages."
               }
@@ -118,9 +121,19 @@ export function Emails() {
                       </Td>
                       <Td className="font-mono text-text-3">{formatDateTime(e.received_date)}</Td>
                       <Td className="text-right">
-                        <Button size="sm" variant="secondary" onClick={() => setPromoteEmail(e)}>
-                          Promote <ArrowRight className="size-3.5" />
-                        </Button>
+                        {e.application_id ? (
+                          <Link
+                            to={`/applications/${e.application_id}`}
+                            className="text-[12px] text-text-3 hover:text-accent hover:underline"
+                            onClick={(ev) => ev.stopPropagation()}
+                          >
+                            Linked
+                          </Link>
+                        ) : (
+                          <Button size="sm" variant="secondary" onClick={() => setPromoteEmail(e)}>
+                            Promote <ArrowRight className="size-3.5" />
+                          </Button>
+                        )}
                       </Td>
                     </Tr>
                   ))}
@@ -129,7 +142,7 @@ export function Emails() {
             </div>
             <div className="flex items-center justify-between border-t border-line px-4 py-3">
               <span className="text-[12px] text-text-3">
-                Showing {filtered.length} of this page · offset {offset}
+                {total} email{total === 1 ? "" : "s"} · showing {offset + 1}–{offset + pageItems.length}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -143,7 +156,7 @@ export function Emails() {
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={!pageFull}
+                  disabled={!hasNextPage}
                   onClick={() => setOffset(offset + EMAILS_PAGE_SIZE)}
                 >
                   Next

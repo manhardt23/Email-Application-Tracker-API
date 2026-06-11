@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 
 import { ErrorState } from "../components/ErrorState";
@@ -8,39 +9,43 @@ import { Card, CardHeader } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Input } from "../components/ui/Input";
 import { MetricCard } from "../components/ui/MetricCard";
+import { Skeleton } from "../components/ui/Skeleton";
 import { Table, Td, Th, Tr } from "../components/ui/Table";
 import { useToast } from "../components/ui/Toast";
 import {
   isTerminalStatus,
-  useJobStatus,
+  useJobsList,
   useSetEmailLimit,
   useStats,
   useTriggerBackfill,
   useTriggerEmailCheck,
 } from "../hooks/useJobs";
+import { queryKeys } from "../lib/query-keys";
 import { errorMessage, formatDateTime, formatRelative } from "../lib/format";
+import type { JobStatus } from "../types/api";
 
 export function JobsAdmin() {
   const toast = useToast();
-  const [jobIds, setJobIds] = useState<string[]>([]);
+  const qc = useQueryClient();
   const check = useTriggerEmailCheck();
   const backfill = useTriggerBackfill();
   const setLimit = useSetEmailLimit();
   const stats = useStats();
+  const jobs = useJobsList();
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [backfillMax, setBackfillMax] = useState("");
   const [limit, setLimitValue] = useState("");
 
-  function trackJob(id: string) {
-    setJobIds((prev) => (prev.includes(id) ? prev : [id, ...prev]));
+  function refreshJobs() {
+    qc.invalidateQueries({ queryKey: queryKeys.jobs.list });
   }
 
   function runCheck() {
     check.mutate(undefined, {
       onSuccess: (r) => {
-        trackJob(r.job_id);
+        refreshJobs();
         toast({ tone: "success", message: `Email check queued (#${r.job_id}).` });
       },
       onError: (e) => toast({ tone: "error", message: errorMessage(e, "Could not start check.") }),
@@ -60,7 +65,7 @@ export function JobsAdmin() {
       },
       {
         onSuccess: (r) => {
-          trackJob(r.job_id);
+          refreshJobs();
           toast({ tone: "success", message: `Backfill queued (#${r.job_id}).` });
         },
         onError: (e) => toast({ tone: "error", message: errorMessage(e, "Could not start backfill.") }),
@@ -145,14 +150,27 @@ export function JobsAdmin() {
 
       <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <Card className="p-0">
-          <div className="p-4">
-            <CardHeader title="Jobs this session" />
+          <div className="flex items-center justify-between p-4">
+            <CardHeader title="Recent jobs" />
+            <Button size="sm" variant="ghost" onClick={refreshJobs} aria-label="Refresh jobs">
+              <RefreshCw className="size-3.5" />
+            </Button>
           </div>
-          {jobIds.length === 0 ? (
+          {jobs.isLoading ? (
+            <div className="space-y-2 px-4 pb-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : jobs.isError ? (
+            <div className="px-4 pb-4">
+              <ErrorState error={jobs.error} onRetry={() => jobs.refetch()} />
+            </div>
+          ) : (jobs.data?.length ?? 0) === 0 ? (
             <div className="px-4 pb-4">
               <EmptyState
-                title="No jobs triggered yet."
-                description="Jobs you start in this session appear here and poll until they finish."
+                title="No jobs run yet."
+                description="Trigger a check or backfill above; recent runs appear here and refresh until they finish."
               />
             </div>
           ) : (
@@ -169,8 +187,8 @@ export function JobsAdmin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {jobIds.map((id) => (
-                    <JobRow key={id} jobId={id} />
+                  {jobs.data?.map((job) => (
+                    <JobRow key={job.job_id} job={job} />
                   ))}
                 </tbody>
               </Table>
@@ -219,26 +237,24 @@ export function JobsAdmin() {
   );
 }
 
-function JobRow({ jobId }: { jobId: string }) {
-  const { data, isLoading, isError } = useJobStatus(jobId);
-  const status = data?.status ?? (isError ? "error" : "queued");
-  const running = !isTerminalStatus(status);
+function JobRow({ job }: { job: JobStatus }) {
+  const running = !isTerminalStatus(job.status);
 
   return (
     <Tr>
-      <Td className="pl-3 font-mono text-text">#{jobId}</Td>
+      <Td className="pl-3 font-mono text-text">#{job.job_id}</Td>
       <Td>
         <span className="inline-flex items-center gap-1.5 text-[12px] text-text-2">
           {running ? (
             <span className="inline-block size-2 animate-pulse rounded-full bg-accent" aria-hidden />
           ) : null}
-          {isLoading ? "loading…" : status}
+          {job.status}
         </span>
       </Td>
-      <Td className="font-mono">{data?.emails_fetched ?? "—"}</Td>
-      <Td className="font-mono">{data?.emails_saved ?? "—"}</Td>
-      <Td className="font-mono">{data?.applications_found ?? "—"}</Td>
-      <Td className="font-mono text-text-3">{data?.finished_at ? formatDateTime(data.finished_at) : "—"}</Td>
+      <Td className="font-mono">{job.emails_fetched ?? "—"}</Td>
+      <Td className="font-mono">{job.emails_saved ?? "—"}</Td>
+      <Td className="font-mono">{job.applications_found ?? "—"}</Td>
+      <Td className="font-mono text-text-3">{job.finished_at ? formatDateTime(job.finished_at) : "—"}</Td>
     </Tr>
   );
 }

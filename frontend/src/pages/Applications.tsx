@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 
@@ -12,11 +12,11 @@ import { Input } from "../components/ui/Input";
 import { Skeleton } from "../components/ui/Skeleton";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { Table, Td, Th, Tr } from "../components/ui/Table";
-import { useApplications } from "../hooks/useApplications";
+import { APPLICATIONS_PAGE_SIZE, useApplications } from "../hooks/useApplications";
 import { formatDate } from "../lib/format";
 import { STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = APPLICATIONS_PAGE_SIZE;
 const FILTERS: { value: string; label: string }[] = [
   { value: "all", label: "All" },
   ...STAGE_OPTIONS.map((s) => ({ value: s, label: statusSwatch(s).label })),
@@ -26,23 +26,23 @@ export function Applications() {
   const navigate = useNavigate();
   const [stage, setStage] = useState("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
-  const query = useApplications(stage);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const rows = query.data ?? [];
-    if (!term) return rows;
-    return rows.filter(
-      (a) =>
-        (a.company?.name ?? "").toLowerCase().includes(term) ||
-        a.position.toLowerCase().includes(term),
-    );
-  }, [query.data, search]);
+  // Debounce the search term so we don't fire a request on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
-  const pageRows = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const query = useApplications(stage, debouncedSearch, page * PAGE_SIZE);
+
+  const rows = query.data?.items ?? [];
+  const total = query.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <>
@@ -55,10 +55,7 @@ export function Applications() {
             className="pl-9"
             placeholder="Search company or role…"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             aria-label="Search applications"
           />
         </div>
@@ -89,12 +86,12 @@ export function Applications() {
           <div className="p-4">
             <ErrorState error={query.error} onRetry={() => query.refetch()} />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="p-4">
             <EmptyState
-              title={search ? "No matching applications." : "No applications found."}
+              title={debouncedSearch || stage !== "all" ? "No matching applications." : "No applications found."}
               description={
-                search
+                debouncedSearch || stage !== "all"
                   ? "Try a different search term or clear the filter."
                   : "Promote an email or trigger a check to start your pipeline."
               }
@@ -114,7 +111,7 @@ export function Applications() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((a) => (
+                  {rows.map((a) => (
                     <Tr key={a.id} clickable onClick={() => navigate(`/applications/${a.id}`)}>
                       <Td className="pl-3 font-medium text-text">
                         {a.company?.name ?? "Unknown company"}
@@ -132,17 +129,17 @@ export function Applications() {
             </div>
             <div className="flex items-center justify-between border-t border-line px-4 py-3">
               <span className="text-[12px] text-text-3">
-                {filtered.length} result{filtered.length === 1 ? "" : "s"} · page {safePage + 1} of {pageCount}
+                {total} result{total === 1 ? "" : "s"} · page {page + 1} of {pageCount}
               </span>
               <div className="flex gap-2">
-                <Button size="sm" variant="secondary" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                <Button size="sm" variant="secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>
                   Prev
                 </Button>
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={safePage >= pageCount - 1}
-                  onClick={() => setPage(safePage + 1)}
+                  disabled={page >= pageCount - 1}
+                  onClick={() => setPage(page + 1)}
                 >
                   Next
                 </Button>

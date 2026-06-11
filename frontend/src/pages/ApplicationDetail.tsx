@@ -12,8 +12,8 @@ import { Select } from "../components/ui/Select";
 import { Skeleton } from "../components/ui/Skeleton";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { useToast } from "../components/ui/Toast";
-import { useApplication, useUpdateApplication } from "../hooks/useApplications";
-import { errorMessage, formatDate } from "../lib/format";
+import { useApplication, useApplicationEmails, useUpdateApplication } from "../hooks/useApplications";
+import { errorMessage, formatDate, formatDateTime } from "../lib/format";
 import { STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
 import type { ApplicationUpdate } from "../types/api";
 
@@ -23,6 +23,7 @@ export function ApplicationDetail() {
   const navigate = useNavigate();
   const toast = useToast();
   const query = useApplication(appId);
+  const emails = useApplicationEmails(appId);
   const update = useUpdateApplication(appId);
 
   const [form, setForm] = useState({ stage: "", company_name: "", position: "", notes: "" });
@@ -157,10 +158,37 @@ export function ApplicationDetail() {
 
         <Card>
           <CardHeader title="Linked emails" />
-          <EmptyState
-            title="No linked emails to show."
-            description="Email-to-application links aren't exposed by the API yet."
-          />
+          {emails.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : emails.isError ? (
+            <ErrorState error={emails.error} onRetry={() => emails.refetch()} />
+          ) : (emails.data?.length ?? 0) === 0 ? (
+            <EmptyState
+              title="No linked emails to show."
+              description="Emails promoted into this application will appear here."
+            />
+          ) : (
+            <ol className="relative ml-1 space-y-4 border-l border-line pl-4">
+              {emails.data?.map((email) => (
+                <li key={email.id} className="relative">
+                  <span
+                    className="absolute -left-[21px] top-1.5 size-2 rounded-full border border-line-strong bg-surface"
+                    aria-hidden
+                  />
+                  <p className="text-[13px] font-medium text-text">
+                    {email.subject || "(no subject)"}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[12px] text-text-3">
+                    {email.sender} · {formatDateTime(email.received_date)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
         </Card>
       </div>
     </>

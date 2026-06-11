@@ -14,8 +14,10 @@ export const queryKeys = {
   },
   applications: {
     all: ["applications"] as const,
-    list: (stage: string) => ["applications", "list", stage] as const,
+    list: (stage: string, q: string, offset: number) =>
+      ["applications", "list", stage, q, offset] as const,
     detail: (id: number) => ["applications", "detail", id] as const,
+    emails: (id: number) => ["applications", "emails", id] as const,
   },
   emails: {
     all: ["emails"] as const,
@@ -23,6 +25,8 @@ export const queryKeys = {
     review: ["emails", "review"] as const,
   },
   jobs: {
+    all: ["jobs"] as const,
+    list: ["jobs", "list"] as const,
     status: (id: string) => ["jobs", "status", id] as const,
   },
   stats: ["stats"] as const,

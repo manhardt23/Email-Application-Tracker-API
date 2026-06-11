@@ -1,30 +1,39 @@
-import { AxiosError } from "axios";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../lib/api";
 import { queryKeys } from "../lib/query-keys";
-import type { Application, ApplicationUpdate } from "../types/api";
+import type { Application, ApplicationUpdate, EmailRow, Paginated } from "../types/api";
+
+export const APPLICATIONS_PAGE_SIZE = 15;
 
 /**
- * GET /applications returns 404 when empty and only supports the `stage`
- * filter (no server search/pagination), so empties are normalized to [].
+ * GET /applications returns a {items,total,limit,offset} envelope and supports
+ * server-side `stage`, `q` search, and `limit`/`offset` pagination.
  */
-export function useApplications(stage: string) {
+export function useApplications(stage: string, q: string, offset: number) {
   return useQuery({
-    queryKey: queryKeys.applications.list(stage),
-    queryFn: async () => {
-      try {
-        const res = await api.get<Application[]>("/applications", {
-          params: stage === "all" ? undefined : { stage },
-        });
-        return res.data;
-      } catch (error) {
-        if (error instanceof AxiosError && error.response?.status === 404) {
-          return [] as Application[];
-        }
-        throw error;
-      }
-    },
+    queryKey: queryKeys.applications.list(stage, q, offset),
+    queryFn: async () =>
+      (
+        await api.get<Paginated<Application>>("/applications", {
+          params: {
+            ...(stage === "all" ? {} : { stage }),
+            ...(q.trim() ? { q: q.trim() } : {}),
+            limit: APPLICATIONS_PAGE_SIZE,
+            offset,
+          },
+        })
+      ).data,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Emails linked to an application — powers the detail-page timeline. */
+export function useApplicationEmails(id: number) {
+  return useQuery({
+    queryKey: queryKeys.applications.emails(id),
+    queryFn: async () => (await api.get<EmailRow[]>(`/applications/${id}/emails`)).data,
+    enabled: Number.isFinite(id) && id > 0,
   });
 }
 

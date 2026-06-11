@@ -8,8 +8,9 @@ import { Card } from "../components/ui/Card";
 import { ClassificationTag } from "../components/ui/ClassificationTag";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Skeleton } from "../components/ui/Skeleton";
-import { useEmailsForReview } from "../hooks/useEmails";
-import { formatDateTime } from "../lib/format";
+import { useToast } from "../components/ui/Toast";
+import { useDismissEmail, useEmailsForReview } from "../hooks/useEmails";
+import { errorMessage, formatDateTime } from "../lib/format";
 import type { EmailRow } from "../types/api";
 
 const CONFIDENCE_FRACTION: Record<string, number> = {
@@ -25,6 +26,8 @@ function confidenceFraction(value: string | null): number {
 
 export function ReviewQueue() {
   const query = useEmailsForReview();
+  const dismiss = useDismissEmail();
+  const toast = useToast();
   const [promoteEmail, setPromoteEmail] = useState<EmailRow | null>(null);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
 
@@ -32,6 +35,21 @@ export function ReviewQueue() {
     () => (query.data ?? []).filter((e) => !dismissed.has(e.id)),
     [query.data, dismissed],
   );
+
+  function handleDismiss(id: number) {
+    setDismissed((prev) => new Set(prev).add(id));
+    dismiss.mutate(id, {
+      onSuccess: () => toast({ tone: "success", message: "Removed from review queue." }),
+      onError: (e) => {
+        setDismissed((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        toast({ tone: "error", message: errorMessage(e, "Could not dismiss email.") });
+      },
+    });
+  }
 
   return (
     <>
@@ -102,10 +120,7 @@ export function ReviewQueue() {
                     <Button variant="primary" onClick={() => setPromoteEmail(email)}>
                       Promote to application
                     </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setDismissed((prev) => new Set(prev).add(email.id))}
-                    >
+                    <Button variant="secondary" onClick={() => handleDismiss(email.id)}>
                       Dismiss
                     </Button>
                   </div>

@@ -17,6 +17,14 @@ export type HealthResponse = {
   status: string;
 };
 
+/** Standard list envelope returned by paginated endpoints. */
+export type Paginated<T> = {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 // --- Dashboard ---
 
 export type DashboardMetrics = {

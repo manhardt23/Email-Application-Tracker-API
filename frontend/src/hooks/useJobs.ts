@@ -35,6 +35,16 @@ export function useSetEmailLimit() {
   });
 }
 
+/** Recent worker runs; keeps polling while any run is still non-terminal. */
+export function useJobsList() {
+  return useQuery({
+    queryKey: queryKeys.jobs.list,
+    queryFn: async () => (await api.get<JobStatus[]>("/jobs")).data,
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((j) => !isTerminalStatus(j.status)) ? 2000 : false,
+  });
+}
+
 /** Polls a single job until it reaches a terminal status. */
 export function useJobStatus(jobId: string) {
   return useQuery({
