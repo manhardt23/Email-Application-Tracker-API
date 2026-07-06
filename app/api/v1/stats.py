@@ -4,9 +4,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from app.auth.dependencies import get_db
 from app.db.models import Email, EmailAnalysis, WorkerRun
+from app.middleware.rate_limit import PUBLIC_LIMIT, get_client_ip, limiter
 
 router = APIRouter()
 
@@ -14,7 +16,8 @@ DbDep = Annotated[Session, Depends(get_db)]
 
 
 @router.get("")
-def get_stats(db: DbDep):
+@limiter.limit(PUBLIC_LIMIT, key_func=get_client_ip, override_defaults=True)
+def get_stats(request: Request, db: DbDep):
     now = datetime.now(UTC)
     seven_days_ago = now - timedelta(days=7)
 

@@ -33,6 +33,10 @@ from app.api.v1.router import api_router
 from app.api.v1.stats import router as stats_router
 from app.auth import dependencies as auth_deps
 from app.db.models import Base, User
+from app.middleware.rate_limit import limiter
+
+# Disable rate limiting for the test suite (routes still carry decorators).
+limiter.enabled = False
 
 # ---------------------------------------------------------------------------
 # Shared in-memory SQLite engine

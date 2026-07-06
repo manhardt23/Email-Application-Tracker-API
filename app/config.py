@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 1440
 
+    # Rate limiting (slowapi) — per-IP for public/login, per-user when authenticated
+    rate_limit_enabled: bool = True
+    rate_limit_login: str = "10/minute"
+    rate_limit_public: str = "60/minute"
+    rate_limit_global: str = "120/minute"
+    rate_limit_expensive: str = "10/minute"
+
     @field_validator("imap_timeout_seconds")
     @classmethod
     def _positive_timeout(cls, v: int) -> int:
