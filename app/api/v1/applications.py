@@ -4,12 +4,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
+from starlette.requests import Request
 
 from app.api.v1.emails import flatten_email
 from app.auth.dependencies import AdminUser, get_db
 from app.db.models import EmailAnalysis
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
+from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
 
 router = APIRouter()
 
@@ -34,7 +36,9 @@ class ApplicationUpdate(BaseModel):
 
 
 @router.get("")
+@limiter.limit(EXPENSIVE_LIMIT)
 def list_applications(
+    request: Request,
     db: DbDep,
     _user: AdminUser,
     stage: str | None = None,

@@ -887,3 +887,117 @@ app/
 
 - Add unit/integration coverage for promote success, missing-analysis promotion, and idempotent re-promote
 - Run targeted and full pytest validation
+
+## Phase 32 Breakdown (manageable chunks)
+
+**Phase:** 32 — API rate limiting  
+**Branch:** `phase32-rate-limiting` (from `main`)  
+**Already done:** Nothing — no rate limiting exists today  
+**This phase delivers:** Configurable tiered rate limits on API endpoints only (`/api/v1/*` and `/stats`). No frontend, nginx, or other feature changes.
+
+### Scope
+
+| In scope | Out of scope |
+| -------- | ------------ |
+| `/api/v1/*` endpoints | SPA static assets at `/` |
+| `GET /stats` | Nginx-level `limit_req` |
+| Env-configurable limits | Redis / multi-replica shared store |
+| 429 responses + unit tests | Auth/RBAC changes |
+
+### Endpoint inventory
+
+| Access | Endpoints |
+| ------ | --------- |
+| **Public (no JWT)** | `GET /api/v1/health`, `POST /api/v1/auth/login`, `GET /stats` |
+| **Any authenticated user** | `GET /api/v1/auth/me`, `GET /api/v1/emails/review` |
+| **Admin only** | applications, dashboard, emails (except review), jobs |
+
+### Rate limit tiers (proposed defaults)
+
+| Tier | Applies to | Default | Key |
+| ---- | ---------- | ------- | --- |
+| **Login** | `POST /api/v1/auth/login` | 10/min | Client IP |
+| **Public** | `GET /api/v1/health`, `GET /stats` | 60/min | Client IP |
+| **Global** | All API routes (baseline) | 120/min | Username from JWT, else IP |
+| **Expensive** | High-cost reads + job triggers | 10/min | Username from JWT, else IP |
+
+**Expensive endpoints** (stack on top of global):
+
+- `POST /api/v1/jobs/email-check`
+- `POST /api/v1/jobs/email-backfill`
+- `GET /api/v1/emails` (up to 1000 rows)
+- `GET /api/v1/emails/review` (up to 1000 rows)
+- `GET /api/v1/applications` (up to 200 rows)
+
+All other authenticated endpoints inherit **global only**.
+
+IP resolution: `X-Forwarded-For` (first hop) → `X-Real-IP` → direct client (Nginx already sets the proxy headers).
+
+### Chunk 1 (dependency + config)
+
+- Add `slowapi>=0.1.9` to `requirements.txt`
+- Add settings to `app/config.py`:
+  - `RATE_LIMIT_ENABLED` (default `true`)
+  - `RATE_LIMIT_LOGIN` (default `10/minute`)
+  - `RATE_LIMIT_PUBLIC` (default `60/minute`)
+  - `RATE_LIMIT_GLOBAL` (default `120/minute`)
+  - `RATE_LIMIT_EXPENSIVE` (default `10/minute`)
+
+### Chunk 2 (limiter module + app wiring)
+
+- Create `app/middleware/rate_limit.py`:
+  - `get_client_ip(request)` — proxy-aware IP extraction
+  - `get_rate_limit_key(request)` — `user:{username}` when Bearer JWT is valid, else `ip:{ip}`
+  - Module-level `limiter` + `configure_rate_limiting(app)` (registers `SlowAPIMiddleware`, 429 handler)
+- Call `configure_rate_limiting(app)` in `app/main.py` before router mount
+
+### Chunk 3 (route decorators)
+
+Add `@limiter.limit(...)` + `request: Request` to targeted handlers only:
+
+| File | Routes | Limit |
+| ---- | ------ | ----- |
+| `auth.py` | `POST /login` | Login (IP, `override_defaults=True`) |
+| `health.py` | `GET /health` | Public (IP, `override_defaults=True`) |
+| `stats.py` | `GET /stats` | Public (IP, `override_defaults=True`) |
+| `jobs.py` | `POST /email-check`, `POST /email-backfill` | Expensive |
+| `emails.py` | `GET /emails`, `GET /emails/review` | Expensive |
+| `applications.py` | `GET /applications` | Expensive |
+
+Global baseline applies everywhere else via limiter `default_limits` — no per-route decorator needed on dashboard, single-resource GETs, PUTs, etc.
+
+### Chunk 4 (tests)
+
+- `tests/unit/test_rate_limit.py`:
+  - IP/key extraction helpers
+  - 429 when limit exceeded (isolated mini-app)
+  - `configure_rate_limiting` skips middleware when disabled
+- `tests/conftest.py`: set `limiter.enabled = False` so existing tests never flake
+
+### Chunk 5 (verification)
+
+- `python -m pytest` — full suite must pass (≥70% coverage gate)
+- Manual smoke: hit `/api/v1/health` repeatedly, confirm 429 after threshold
+
+### Deployment notes
+
+- Single EC2 / single Uvicorn process → in-memory store is sufficient
+- Set `RATE_LIMIT_ENABLED=false` locally if needed during heavy dev
+- If API is ever scaled to multiple replicas, revisit with Redis-backed storage
+
+### Files touched (expected)
+
+| File | Change |
+| ---- | ------ |
+| `requirements.txt` | Add `slowapi` |
+| `app/config.py` | Rate limit settings |
+| `app/middleware/rate_limit.py` | **New** — limiter setup |
+| `app/main.py` | Wire middleware |
+| `app/api/v1/auth.py` | Login limit |
+| `app/api/v1/health.py` | Public limit |
+| `app/api/v1/stats.py` | Public limit |
+| `app/api/v1/jobs.py` | Expensive limits |
+| `app/api/v1/emails.py` | Expensive limit on list |
+| `app/api/v1/applications.py` | Expensive limit on list |
+| `tests/conftest.py` | Disable limiter in tests |
+| `tests/unit/test_rate_limit.py` | **New** — unit tests |

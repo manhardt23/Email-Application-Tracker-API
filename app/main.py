@@ -8,6 +8,7 @@ from starlette.staticfiles import StaticFiles
 from app.api.v1.stats import router as stats_router
 from app.db import models
 from app.db.database import engine
+from app.middleware.rate_limit import configure_rate_limiting
 
 
 class SPAStaticFiles(StaticFiles):
@@ -38,6 +39,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     from app.api.v1.router import api_router
+
+    configure_rate_limiting(app)
 
     app.include_router(api_router, prefix="/api/v1")
     app.include_router(stats_router, prefix="/stats", tags=["stats"])
