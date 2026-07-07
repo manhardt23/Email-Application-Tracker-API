@@ -22,13 +22,19 @@ def test_build_classifier_routes_to_ollama(monkeypatch):
 
 
 def test_build_classifier_routes_to_groq(monkeypatch):
-    fake_module = SimpleNamespace(GroqAdapter=lambda api_key: ("groq-classifier", api_key))
+    fake_module = SimpleNamespace(
+        GroqAdapter=lambda api_key, model: ("groq-classifier", api_key, model)
+    )
     monkeypatch.setitem(sys.modules, "app.llm.groq_adapter", fake_module)
-    settings = SimpleNamespace(llm_provider="groq", groq_api_key="test-key")
+    settings = SimpleNamespace(
+        llm_provider="groq",
+        groq_api_key="test-key",
+        groq_model="openai/gpt-oss-120b",
+    )
 
     classifier = build_classifier(settings)
 
-    assert classifier == ("groq-classifier", "test-key")
+    assert classifier == ("groq-classifier", "test-key", "openai/gpt-oss-120b")
 
 
 def test_build_classifier_rejects_invalid_provider():

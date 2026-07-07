@@ -1,7 +1,7 @@
 """
 Groq LLM adapter — implemented in Phase 4.
 Requires: GROQ_API_KEY set in environment / .env
-Model: llama-3.1-8b-instant (free tier, 14,400 req/day, 30 req/min)
+Default model: openai/gpt-oss-120b (override via GROQ_MODEL)
 """
 from app.llm.base import EmailClassification
 from app.llm.errors import LLMProviderError, LLMResponseError
@@ -46,7 +46,7 @@ class GroqAdapter:
     def __init__(
         self,
         api_key: str | None,
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "openai/gpt-oss-120b",
     ) -> None:
         try:
             from groq import Groq
@@ -58,6 +58,10 @@ class GroqAdapter:
             raise ValueError("GROQ_API_KEY is required when LLM_PROVIDER='groq'.")
         self.client = Groq(api_key=api_key)
         self.model = model
+
+    @property
+    def model_name(self) -> str:
+        return self.model
 
     def classify_email(
         self, sender: str, subject: str, body: str
