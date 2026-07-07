@@ -263,7 +263,11 @@ def run(
             if match:
                 match_type, existing = match
                 logger.info(
-                    "run_id=%s skipping as duplicate (matched on %s) — incoming uid=%s message_id=%s | existing row id=%s uid=%s message_id=%s received_date=%s",
+                    (
+                        "run_id=%s skipping as duplicate (matched on %s) — "
+                        "incoming uid=%s message_id=%s | existing row id=%s uid=%s "
+                        "message_id=%s received_date=%s"
+                    ),
                     run_id,
                     match_type,
                     email_data.uid,

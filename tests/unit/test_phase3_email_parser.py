@@ -1,6 +1,6 @@
 import imaplib
 import importlib
-from datetime import datetime
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from types import SimpleNamespace
 
@@ -145,9 +145,18 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
         def close(self) -> None:
             return None
 
+    class _FakeExistingEmail:
+        id = 42
+        uid = "uid-old"
+        message_id = "<dup@example.test>"
+        received_date = datetime(2025, 1, 1, tzinfo=UTC)
+
     class _FakeEmailRepository:
         def __init__(self, session):  # noqa: ANN001
             self.session = session
+
+        def find_match_reason(self, message_id, uid):  # noqa: ANN001
+            return ("message_id", _FakeExistingEmail())
 
         def exists(self, message_id, uid):  # noqa: ANN001
             return True  # simulate duplicate
@@ -226,7 +235,7 @@ def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
     with caplog.at_level(logging.DEBUG):
         worker_module.run()
 
-    assert "duplicate email" in caplog.text.lower()
+    assert "skipping as duplicate" in caplog.text.lower()
 
 
 def test_fetch_recent_emails_happy_path_full_parse(monkeypatch):
@@ -404,6 +413,9 @@ def test_worker_processes_new_email_successfully(monkeypatch):
     class _FakeEmailRepository:
         def __init__(self, session):  # noqa: ANN001
             self.session = session
+
+        def find_match_reason(self, message_id, uid):  # noqa: ANN001
+            return None
 
         def exists(self, message_id, uid):  # noqa: ANN001
             return False
