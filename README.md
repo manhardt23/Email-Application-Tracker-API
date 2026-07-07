@@ -51,7 +51,7 @@ The worker stays decoupled from API request/response flow and runs as a one-shot
 - **Data layer:** SQLAlchemy 2.x repositories + Alembic migration assets
 - **Database:** PostgreSQL 16 (Compose-managed)
 - **Email ingestion/parsing:** IMAP + BeautifulSoup4 + `quick_filter` pre-screening
-- **LLM integration:** Groq (`llama-3.3-70b-versatile`) and Ollama via provider abstraction
+- **LLM integration:** Groq (`openai/gpt-oss-120b` by default) and Ollama via provider abstraction
 - **Containerization:** Docker multi-stage build + Docker Compose
 - **Quality/verification:** pytest, pytest-cov, ruff
 - **CI/CD + cloud:** GitHub Actions, Amazon ECR, EC2 (SSH deploy workflow)
@@ -120,6 +120,7 @@ docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 | `EMAIL_PASS` | IMAP account password |
 | `LLM_PROVIDER` | `groq` or `ollama` |
 | `GROQ_API_KEY` | Required when `LLM_PROVIDER=groq` |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` (Groq model id; only used when `LLM_PROVIDER=groq`) |
 
 ### Optional worker knobs
 

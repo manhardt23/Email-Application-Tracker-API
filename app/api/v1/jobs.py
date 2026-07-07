@@ -5,10 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from app.auth.dependencies import AdminUser, get_db
 from app.db.models import WorkerRun
 from app.db.repositories.worker_run_repo import WorkerRunRepository
+from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
 from app.services.worker_runtime import set_max_emails_override
 
 router = APIRouter()
@@ -61,7 +63,13 @@ def _run_worker(
 
 
 @router.post("/email-check", status_code=202)
-def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep, _user: AdminUser):
+@limiter.limit(EXPENSIVE_LIMIT)
+def trigger_email_check(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: DbDep,
+    _user: AdminUser,
+):
     repo = WorkerRunRepository(db)
     run = repo.try_create_queued_run()
     if run is None:
@@ -74,7 +82,9 @@ def trigger_email_check(background_tasks: BackgroundTasks, db: DbDep, _user: Adm
 
 
 @router.post("/email-backfill", status_code=202)
+@limiter.limit(EXPENSIVE_LIMIT)
 def trigger_email_backfill(
+    request: Request,
     body: BackfillRequest,
     background_tasks: BackgroundTasks,
     db: DbDep,

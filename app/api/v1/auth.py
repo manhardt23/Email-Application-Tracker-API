@@ -3,17 +3,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from app.auth.dependencies import CurrentUser, get_db
 from app.auth.hashing import verify_password
 from app.auth.jwt_handler import create_access_token
 from app.db.repositories.user_repo import UserRepository
+from app.middleware.rate_limit import LOGIN_LIMIT, get_client_ip, limiter
 
 router = APIRouter()
 
 
 @router.post("/login")
+@limiter.limit(LOGIN_LIMIT, key_func=get_client_ip, override_defaults=True)
 def login(
+    request: Request,
     form: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[Session, Depends(get_db)],
 ):

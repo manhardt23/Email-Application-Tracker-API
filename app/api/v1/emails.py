@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
+from starlette.requests import Request
 
 from app.auth.dependencies import AdminUser, CurrentUser, get_db
 from app.db.models import Email, EmailAnalysis
@@ -10,6 +11,7 @@ from app.db.repositories.analysis_repo import AnalysisRepository
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.llm.base import EmailClassification
+from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
 
 router = APIRouter()
 
@@ -47,7 +49,9 @@ def flatten_email(email: Email) -> dict:
 
 
 @router.get("")
+@limiter.limit(EXPENSIVE_LIMIT)
 def list_emails(
+    request: Request,
     db: DbDep,
     _user: AdminUser,
     limit: int = Query(100, ge=1, le=1000),
@@ -71,7 +75,9 @@ def list_emails(
 
 
 @router.get("/review")
+@limiter.limit(EXPENSIVE_LIMIT)
 def list_emails_for_review(
+    request: Request,
     db: DbDep,
     _user: CurrentUser,
     limit: int = Query(100, ge=1, le=1000),

@@ -30,11 +30,19 @@ class Settings(BaseSettings):
     # LLM — set to "groq" for production, "ollama" for local dev
     llm_provider: str = "groq"
     groq_api_key: str | None = None
+    groq_model: str = "openai/gpt-oss-120b"
 
     # JWT — set JWT_SECRET to a long random string in production
     jwt_secret: str = "changeme"
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 1440
+
+    # Rate limiting (slowapi) — per-IP for public/login, per-user when authenticated
+    rate_limit_enabled: bool = True
+    rate_limit_login: str = "10/minute"
+    rate_limit_public: str = "60/minute"
+    rate_limit_global: str = "120/minute"
+    rate_limit_expensive: str = "10/minute"
 
     @field_validator("imap_timeout_seconds")
     @classmethod
@@ -66,8 +74,9 @@ class Settings(BaseSettings):
 
     def safe_summary(self) -> str:
         """Return a one-line config summary safe to log (no secrets)."""
+        model_part = f" groq_model={self.groq_model}" if self.llm_provider == "groq" else ""
         return (
-            f"provider={self.llm_provider} imap_server={self.imap_server} "
+            f"provider={self.llm_provider}{model_part} imap_server={self.imap_server} "
             f"imap_timeout={self.imap_timeout_seconds}s "
             f"email_limit={self.email_limit} max_emails={self.max_emails_per_run} "
             f"stale_ttl={self.stale_run_ttl_minutes}m"

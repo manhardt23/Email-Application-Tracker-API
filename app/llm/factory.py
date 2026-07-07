@@ -7,7 +7,7 @@ def build_classifier(settings: Settings) -> LLMClassifier:
     if provider == "groq":
         from app.llm.groq_adapter import GroqAdapter
 
-        return GroqAdapter(api_key=settings.groq_api_key)
+        return GroqAdapter(api_key=settings.groq_api_key, model=settings.groq_model)
     if provider == "ollama":
         from app.llm.ollama_adapter import OllamaAdapter
 
