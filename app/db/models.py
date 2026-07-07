@@ -10,6 +10,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
+    func,
     literal_column,
     text,
 )
@@ -29,7 +31,10 @@ class Company(Base):
     name = Column(String(255), unique=True, nullable=False, index=True)
     domain = Column(String(255))
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
     applications = relationship(
@@ -48,12 +53,16 @@ class Application(Base):
     id = Column(Integer, primary_key=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
     position = Column(String(500), nullable=False)
-    stage = Column(String(50), default="applied", nullable=False)
+    stage = Column(String(50), server_default="applied", default="applied", nullable=False)
     applied_date = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
     )
     last_updated = Column(
         DateTime(timezone=True),
+        server_default=func.now(),
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
@@ -86,7 +95,10 @@ class Email(Base):
     received_date = Column(DateTime(timezone=True), nullable=False, index=True)
     body = Column(Text)
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
     analysis = relationship(
@@ -120,15 +132,16 @@ class WorkerRun(Base):
     last_processed_uid = Column(Integer, nullable=True)
     queued_at = Column(
         DateTime(timezone=True),
+        server_default=func.now(),
         default=lambda: datetime.now(UTC),
         nullable=False,
     )
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(20), default="queued", nullable=False)
-    emails_fetched = Column(Integer, default=0, nullable=False)
-    applications_found = Column(Integer, default=0, nullable=False)
-    emails_saved = Column(Integer, default=0, nullable=False)
+    status = Column(String(20), server_default="queued", default="queued", nullable=False)
+    emails_fetched = Column(Integer, server_default="0", default=0, nullable=False)
+    applications_found = Column(Integer, server_default="0", default=0, nullable=False)
+    emails_saved = Column(Integer, server_default="0", default=0, nullable=False)
     error_message = Column(Text, nullable=True)
 
     analyses = relationship("EmailAnalysis", back_populates="worker_run")
@@ -144,15 +157,20 @@ class EmailAnalysis(Base):
     email_id = Column(Integer, ForeignKey("emails.id"), nullable=False, unique=True, index=True)
     worker_run_id = Column(Integer, ForeignKey("worker_runs.id"), nullable=True, index=True)
     application_id = Column(Integer, ForeignKey("applications.id"), nullable=True, index=True)
-    is_application = Column(Boolean, default=False, nullable=False)
+    is_application = Column(Boolean, server_default=false(), default=False, nullable=False)
     detected_company = Column(String(255))
     detected_position = Column(String(500))
     detected_stage = Column(String(50))
     confidence = Column(String(20))
-    needs_review = Column(Boolean, default=False, nullable=False, index=True)
+    needs_review = Column(
+        Boolean, server_default=false(), default=False, nullable=False, index=True
+    )
     model_used = Column(String(100))
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
     email = relationship("Email", back_populates="analysis")
@@ -172,9 +190,12 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(20), nullable=False, default="viewer")
+    role = Column(String(20), server_default="viewer", default="viewer", nullable=False)
     created_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
     def __repr__(self) -> str:
