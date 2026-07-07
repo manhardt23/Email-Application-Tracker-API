@@ -15,10 +15,18 @@ class EmailRepository(BaseRepository):
     def find_by_uid(self, uid: str) -> Email | None:
         return self.session.query(Email).filter(Email.uid == uid).first()
 
+    def find_match_reason(self, message_id: str | None, uid: str) -> tuple[str, Email] | None:
+        if message_id:
+            matched = self.find_by_message_id(message_id)
+            if matched:
+                return ("message_id", matched)
+        matched = self.find_by_uid(uid)
+        if matched:
+            return ("uid", matched)
+        return None
+
     def exists(self, message_id: str | None, uid: str) -> bool:
-        if message_id and self.find_by_message_id(message_id):
-            return True
-        return self.find_by_uid(uid) is not None
+        return self.find_match_reason(message_id, uid) is not None
 
     def create(
         self,
