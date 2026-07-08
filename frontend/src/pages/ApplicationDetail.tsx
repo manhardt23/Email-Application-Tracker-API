@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Unlink } from "lucide-react";
 
 import { ErrorState } from "../components/ErrorState";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Card, CardHeader } from "../components/ui/Card";
+import { ClassificationTag } from "../components/ui/ClassificationTag";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Input, Textarea } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
@@ -13,8 +14,9 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { useToast } from "../components/ui/Toast";
 import { useApplication, useApplicationEmails, useUpdateApplication } from "../hooks/useApplications";
+import { useUnlinkEmail } from "../hooks/useEmails";
 import { errorMessage, formatDate, formatDateTime } from "../lib/format";
-import { STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
+import { classifyEmail, STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
 import type { ApplicationUpdate } from "../types/api";
 
 export function ApplicationDetail() {
@@ -25,8 +27,26 @@ export function ApplicationDetail() {
   const query = useApplication(appId);
   const emails = useApplicationEmails(appId);
   const update = useUpdateApplication(appId);
+  const unlink = useUnlinkEmail();
 
   const [form, setForm] = useState({ stage: "", company_name: "", position: "", notes: "" });
+
+  const correspondenceSummary = useMemo(() => {
+    const rows = emails.data ?? [];
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const label = classifyEmail(row).label;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return { total: rows.length, counts: Array.from(counts.entries()) };
+  }, [emails.data]);
+
+  function handleUnlink(emailId: number) {
+    unlink.mutate(emailId, {
+      onSuccess: () => toast({ tone: "success", message: "Email unlinked from application." }),
+      onError: (e) => toast({ tone: "error", message: errorMessage(e, "Could not unlink email.") }),
+    });
+  }
 
   useEffect(() => {
     if (query.data) {
@@ -169,25 +189,49 @@ export function ApplicationDetail() {
           ) : (emails.data?.length ?? 0) === 0 ? (
             <EmptyState
               title="No linked emails to show."
-              description="Emails promoted into this application will appear here."
+              description="Promote or link emails from the Emails tab to see them here."
             />
           ) : (
-            <ol className="relative ml-1 space-y-4 border-l border-line pl-4">
-              {emails.data?.map((email) => (
-                <li key={email.id} className="relative">
-                  <span
-                    className="absolute -left-[21px] top-1.5 size-2 rounded-full border border-line-strong bg-surface"
-                    aria-hidden
-                  />
-                  <p className="text-[13px] font-medium text-text">
-                    {email.subject || "(no subject)"}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[12px] text-text-3">
-                    {email.sender} · {formatDateTime(email.received_date)}
-                  </p>
-                </li>
-              ))}
-            </ol>
+            <>
+              <p className="mb-3.5 text-[12px] text-text-3">
+                {correspondenceSummary.total} email{correspondenceSummary.total === 1 ? "" : "s"} —{" "}
+                {correspondenceSummary.counts
+                  .map(([label, count]) => `${count} ${label.toLowerCase()}`)
+                  .join(", ")}
+              </p>
+              <ol className="relative ml-1 space-y-4 border-l border-line pl-4">
+                {emails.data?.map((email) => (
+                  <li key={email.id} className="relative">
+                    <span
+                      className="absolute -left-[21px] top-1.5 size-2 rounded-full border border-line-strong bg-surface"
+                      aria-hidden
+                    />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-medium text-text">
+                          {email.subject || "(no subject)"}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[12px] text-text-3">
+                          {email.sender} · {formatDateTime(email.received_date)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <ClassificationTag email={email} />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Unlink from this application"
+                          aria-label="Unlink from this application"
+                          onClick={() => handleUnlink(email.id)}
+                        >
+                          <Unlink className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
         </Card>
       </div>
