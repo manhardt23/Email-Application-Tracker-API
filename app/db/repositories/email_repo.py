@@ -26,7 +26,9 @@ class EmailRepository(BaseRepository):
         return None
 
     def exists(self, message_id: str | None, uid: str) -> bool:
-        return self.find_match_reason(message_id, uid) is not None
+        if not message_id:
+            return False
+        return self.find_by_message_id(message_id) is not None
 
     def create(
         self,

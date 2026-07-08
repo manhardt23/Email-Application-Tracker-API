@@ -105,10 +105,10 @@ class TestEmailRepository:
         repo = EmailRepository(session)
         assert repo.exists("<m1@test>", "some-other-uid") is True
 
-    def test_exists_true_by_uid(self, session):
+    def test_exists_false_when_only_uid_matches(self, session):
         _create_email(session)
         repo = EmailRepository(session)
-        assert repo.exists(None, "uid-1") is True
+        assert repo.exists(None, "uid-1") is False
 
     def test_exists_false_for_missing(self, session):
         repo = EmailRepository(session)

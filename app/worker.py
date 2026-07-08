@@ -259,23 +259,12 @@ def run(
             except (TypeError, ValueError):
                 logger.warning("run_id=%s invalid UID value=%r", run_id, email_data.uid)
 
-            match = email_repo.find_match_reason(email_data.message_id, email_data.uid)
-            if match:
-                match_type, existing = match
+            if email_repo.exists(email_data.message_id, email_data.uid):
                 logger.info(
-                    (
-                        "run_id=%s skipping as duplicate (matched on %s) — "
-                        "incoming uid=%s message_id=%s | existing row id=%s uid=%s "
-                        "message_id=%s received_date=%s"
-                    ),
+                    "run_id=%s skipping as duplicate — message_id=%s uid=%s",
                     run_id,
-                    match_type,
-                    email_data.uid,
                     email_data.message_id,
-                    existing.id,
-                    existing.uid,
-                    existing.message_id,
-                    existing.received_date,
+                    email_data.uid,
                 )
                 continue
 
