@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Link2, Search, Unlink } from "lucide-react";
 
 import { ErrorState } from "../components/ErrorState";
+import { LinkDrawer } from "../components/LinkDrawer";
 import { PageHeader } from "../components/PageHeader";
 import { PromoteDrawer } from "../components/PromoteDrawer";
 import { Button } from "../components/ui/Button";
@@ -13,8 +14,9 @@ import { FilterPill } from "../components/ui/FilterPill";
 import { Input } from "../components/ui/Input";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Table, Td, Th, Tr } from "../components/ui/Table";
-import { EMAILS_PAGE_SIZE, useEmails } from "../hooks/useEmails";
-import { formatDateTime } from "../lib/format";
+import { useToast } from "../components/ui/Toast";
+import { EMAILS_PAGE_SIZE, useEmails, useUnlinkEmail } from "../hooks/useEmails";
+import { errorMessage, formatDateTime } from "../lib/format";
 import { classifyEmail } from "../lib/semantic";
 import type { EmailRow } from "../types/api";
 
@@ -29,11 +31,21 @@ const CLASS_FILTERS = [
 ];
 
 export function Emails() {
+  const toast = useToast();
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [promoteEmail, setPromoteEmail] = useState<EmailRow | null>(null);
+  const [linkEmail, setLinkEmail] = useState<EmailRow | null>(null);
   const query = useEmails(offset);
+  const unlink = useUnlinkEmail();
+
+  function handleUnlink(email: EmailRow) {
+    unlink.mutate(email.id, {
+      onSuccess: () => toast({ tone: "success", message: "Email unlinked from application." }),
+      onError: (e) => toast({ tone: "error", message: errorMessage(e, "Could not unlink email.") }),
+    });
+  }
 
   const pageItems = useMemo(() => query.data?.items ?? [], [query.data]);
   const total = query.data?.total ?? 0;
@@ -122,17 +134,33 @@ export function Emails() {
                       <Td className="font-mono text-text-3">{formatDateTime(e.received_date)}</Td>
                       <Td className="text-right">
                         {e.application_id ? (
-                          <Link
-                            to={`/applications/${e.application_id}`}
-                            className="text-[12px] text-text-3 hover:text-accent hover:underline"
-                            onClick={(ev) => ev.stopPropagation()}
-                          >
-                            Linked
-                          </Link>
+                          <div className="flex items-center justify-end gap-2.5">
+                            <Link
+                              to={`/applications/${e.application_id}`}
+                              className="text-[12px] text-text-3 hover:text-accent hover:underline"
+                              onClick={(ev) => ev.stopPropagation()}
+                            >
+                              Linked
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Unlink from application"
+                              aria-label="Unlink from application"
+                              onClick={() => handleUnlink(e)}
+                            >
+                              <Unlink className="size-3.5" />
+                            </Button>
+                          </div>
                         ) : (
-                          <Button size="sm" variant="secondary" onClick={() => setPromoteEmail(e)}>
-                            Promote <ArrowRight className="size-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button size="sm" variant="secondary" onClick={() => setLinkEmail(e)}>
+                              <Link2 className="size-3.5" /> Link
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => setPromoteEmail(e)}>
+                              Promote <ArrowRight className="size-3.5" />
+                            </Button>
+                          </div>
                         )}
                       </Td>
                     </Tr>
@@ -168,6 +196,7 @@ export function Emails() {
       </Card>
 
       <PromoteDrawer email={promoteEmail} open={promoteEmail !== null} onClose={() => setPromoteEmail(null)} />
+      <LinkDrawer email={linkEmail} open={linkEmail !== null} onClose={() => setLinkEmail(null)} />
     </>
   );
 }
