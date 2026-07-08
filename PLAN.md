@@ -759,27 +759,21 @@ app/
 - Validate nginx config in container (`nginx -t`)
 - Reload/recreate nginx with updated cert mount and config
 
-## Phase 33 Breakdown (manageable chunks) — PROPOSED, awaiting confirmation
+## Phase 33 Breakdown (manageable chunks) — CONFIRMED
 
 **Phase:** 33 — Link correspondence emails to existing applications
 **Branch:** `cursor/phase33-email-correspondence-linking-8364` (from `main`)
 **Already done:** Emails ingest with `EmailAnalysis.application_id` (nullable FK), `POST /emails/{id}/promote` (creates/finds an application by company+position and links), `GET /applications/{id}/emails` timeline on the application detail page, client-side `classifyEmail()` tagging (interview invite / acknowledgement / offer / rejection / not relevant / needs review).
-**This phase delivers:** From the Emails tab, attach a correspondence email (thank-you note, recruiter reply, automated rejection, etc.) to an **existing** application without creating a new one or mutating its stage — plus a per-application view that makes thin correspondence (e.g. "just an ack and an auto-rejection, nothing else") obvious at a glance. **Explicitly excludes** any changes to the Needs Review queue/flow (slated for a separate revamp).
+**This phase delivers:** From the Emails tab, attach a correspondence email (thank-you note, recruiter reply, automated rejection, etc.) to an **existing** application without creating a new one or mutating its stage — plus a per-application view (Application Detail page only) that makes thin correspondence (e.g. "just an ack and an auto-rejection, nothing else") obvious at a glance. **Explicitly excludes** any changes to the Needs Review queue/flow (slated for a separate revamp) and any dashboard changes.
 
-### Assumptions (stated for confirmation, not yet built)
+### Decisions (confirmed)
 
 - Linking is a distinct action from **Promote**: Promote creates/attaches by company+position and forces `is_application=True`; **Link** just sets `application_id` on the email's analysis and leaves `is_application`/`detected_*`/stage untouched.
-- Linking does **not** change the application's `stage` automatically — stage stays a manual/pipeline concern, kept separate from correspondence linking.
+- Linking does **not** change the application's `stage` automatically (**Option A**) — stage stays a fully manual/pipeline concern, edited only via the existing Application Detail stage dropdown, never nudged or auto-applied by linking an email.
 - Only `admin` role can link/unlink (matches existing `promote`/`dismiss` RBAC).
 - Existing application search reuses `GET /applications?q=` (no new search endpoint needed).
-- An email can be re-linked to a different application by unlinking first, then linking again (no direct "move" endpoint in this phase).
-- "Easily see" correspondence health is satisfied by classification tags + a small counts summary on the application detail page — no new automated "thin correspondence" flag/alert elsewhere (e.g. Applications list) in this phase.
-
-### Open questions
-
-1. Should linking ever be allowed to *also* nudge the application's stage (e.g. linking a detected rejection prompts a stage change), or must that stay a fully separate manual edit as assumed above?
-2. Should an already-linked email support "move to a different application" directly, or is unlink-then-link acceptable?
-3. Is a classification-count summary on the Application Detail page enough, or do you also want a "thin correspondence" signal surfaced on the Applications list/dashboard (e.g. a badge for applications with only automated-looking replies)?
+- Moving an email to a different application is unlink-then-link (no direct "move" endpoint in this phase).
+- Correspondence visibility is scoped to the **Application Detail page only** — classification tags + a small counts summary on that page's linked-emails timeline. No dashboard changes, no Applications-list badge.
 
 ### Chunk 1 (phase bootstrap)
 
