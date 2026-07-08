@@ -117,6 +117,10 @@ export type PromoteResponse = {
   stage: string;
 };
 
+export type LinkEmailRequest = {
+  application_id: number;
+};
+
 // --- Jobs / stats ---
 
 export type JobTriggerResponse = {

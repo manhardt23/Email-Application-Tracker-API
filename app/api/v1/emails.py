@@ -28,6 +28,10 @@ class EmailPromoteRequest(BaseModel):
     stage: str | None = None
 
 
+class EmailLinkRequest(BaseModel):
+    application_id: int
+
+
 def flatten_email(email: Email) -> dict:
     a: EmailAnalysis | None = email.analysis
     return {
@@ -176,6 +180,71 @@ def promote_email_to_application(
         "position": application.position,
         "stage": application.stage,
     }
+
+
+@router.post("/{email_id}/link")
+def link_email_to_application(
+    email_id: int,
+    body: EmailLinkRequest,
+    db: DbDep,
+    _user: AdminUser,
+):
+    """Attach an existing, already-classified email (correspondence, thank-you,
+    automated rejection, etc.) to an existing application. Unlike ``promote``,
+    this never creates an application and never touches ``is_application``,
+    ``detected_*``, or the application's ``stage`` — it is purely a
+    record-keeping link so the application's timeline shows every related
+    email."""
+    email = (
+        db.query(Email)
+        .options(joinedload(Email.analysis))
+        .filter(Email.id == email_id)
+        .first()
+    )
+    if email is None:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    application = ApplicationRepository(db).get_by_id(body.application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    analysis_repo = AnalysisRepository(db)
+    analysis = email.analysis
+    if analysis is None:
+        classification = EmailClassification(is_application=False, confidence="manual")
+        analysis = analysis_repo.create(
+            email_id=email.id,
+            classification=classification,
+            model_used="manual_link",
+            worker_run_id=None,
+        )
+        analysis.needs_review = False
+
+    analysis_repo.link_to_application(analysis, application.id)
+    db.commit()
+    db.refresh(email)
+    return flatten_email(email)
+
+
+@router.post("/{email_id}/unlink")
+def unlink_email_from_application(email_id: int, db: DbDep, _user: AdminUser):
+    """Clear a correspondence link, correcting a mistaken ``link``/``promote``.
+    Preserves the analysis's other fields — only ``application_id`` is cleared."""
+    email = (
+        db.query(Email)
+        .options(joinedload(Email.analysis))
+        .filter(Email.id == email_id)
+        .first()
+    )
+    if email is None:
+        raise HTTPException(status_code=404, detail="Email not found")
+    if email.analysis is None or email.analysis.application_id is None:
+        raise HTTPException(status_code=404, detail="Email is not linked to an application")
+
+    AnalysisRepository(db).unlink_from_application(email.analysis)
+    db.commit()
+    db.refresh(email)
+    return flatten_email(email)
 
 
 @router.post("/{email_id}/dismiss")

@@ -759,6 +759,68 @@ app/
 - Validate nginx config in container (`nginx -t`)
 - Reload/recreate nginx with updated cert mount and config
 
+## Phase 33 Breakdown (manageable chunks) — CONFIRMED
+
+**Phase:** 33 — Link correspondence emails to existing applications
+**Branch:** `cursor/phase33-email-correspondence-linking-8364` (from `main`)
+**Already done:** Emails ingest with `EmailAnalysis.application_id` (nullable FK), `POST /emails/{id}/promote` (creates/finds an application by company+position and links), `GET /applications/{id}/emails` timeline on the application detail page, client-side `classifyEmail()` tagging (interview invite / acknowledgement / offer / rejection / not relevant / needs review).
+**This phase delivers:** From the Emails tab, attach a correspondence email (thank-you note, recruiter reply, automated rejection, etc.) to an **existing** application without creating a new one or mutating its stage — plus a per-application view (Application Detail page only) that makes thin correspondence (e.g. "just an ack and an auto-rejection, nothing else") obvious at a glance. **Explicitly excludes** any changes to the Needs Review queue/flow (slated for a separate revamp) and any dashboard changes.
+
+### Decisions (confirmed)
+
+- Linking is a distinct action from **Promote**: Promote creates/attaches by company+position and forces `is_application=True`; **Link** just sets `application_id` on the email's analysis and leaves `is_application`/`detected_*`/stage untouched.
+- Linking does **not** change the application's `stage` automatically (**Option A**) — stage stays a fully manual/pipeline concern, edited only via the existing Application Detail stage dropdown, never nudged or auto-applied by linking an email.
+- Only `admin` role can link/unlink (matches existing `promote`/`dismiss` RBAC).
+- Existing application search reuses `GET /applications?q=` (no new search endpoint needed).
+- Moving an email to a different application is unlink-then-link (no direct "move" endpoint in this phase).
+- Correspondence visibility is scoped to the **Application Detail page only** — classification tags + a small counts summary on that page's linked-emails timeline. No dashboard changes, no Applications-list badge.
+
+### Chunk 1 (phase bootstrap)
+
+- Branch from `main`: `cursor/phase33-email-correspondence-linking-8364`
+- Keep all Phase 33 work on this branch until the phase is agreed complete
+
+### Chunk 2 (link/unlink API)
+
+- Add `POST /api/v1/emails/{email_id}/link` (admin-only), body `{application_id: int}`
+  - 404 if email or application not found
+  - If the email has no `EmailAnalysis` yet, create a minimal one (`is_application=False`, `confidence="manual"`, `needs_review=False`) then set `application_id`
+  - If an analysis exists, only set `application_id` — leave `is_application`/`detected_*`/`needs_review` as-is
+  - Idempotent: linking to the same application twice is a no-op success
+- Add `POST /api/v1/emails/{email_id}/unlink` (admin-only)
+  - 404 if email not found or not currently linked
+  - Clears `application_id` only; preserves all other analysis fields
+- Extend `AnalysisRepository` with `unlink_from_application` (mirrors existing `link_to_application`) and a shared helper for "ensure a manual analysis row exists" reused by both `promote` and `link`
+
+### Chunk 3 (backend tests)
+
+- `tests/unit/test_phase33_email_linking.py`:
+  - link with existing analysis, link with no analysis (creates one), link 404s (missing email/application)
+  - unlink success, unlink 404 (not linked / missing email)
+  - idempotent re-link to same application
+  - viewer role gets 403 on both endpoints
+
+### Chunk 4 (frontend data layer)
+
+- `types/api.ts`: `LinkEmailRequest { application_id: number }`
+- `hooks/useEmails.ts`: `useLinkEmail()`, `useUnlinkEmail()` — invalidate emails, applications, and dashboard query keys on success (mirrors `usePromoteEmail`)
+
+### Chunk 5 (Link drawer — Emails tab)
+
+- New `LinkDrawer` component (sibling to `PromoteDrawer`): debounced search input against `GET /applications?q=`, results list (company — position — stage badge), select-to-confirm, calls `POST /emails/{id}/link`
+- `Emails.tsx` action cell: when unlinked, show both **Promote** and **Link** actions; when linked, keep the "Linked" link and add a small **Unlink** affordance
+
+### Chunk 6 (application detail correspondence view)
+
+- `ApplicationDetail.tsx` "Linked emails" card: render the existing `ClassificationTag` per timeline item (reuse from Emails page) and add a compact summary strip above the list (e.g. "3 emails — 1 acknowledgement, 1 rejection, 1 interview invite") computed client-side via `classifyEmail()`
+- Add an **Unlink** action per timeline row for correcting mistaken links from the application side too
+
+### Chunk 7 (verification)
+
+- Backend: `pytest` (coverage gate) + `ruff check .` on touched files
+- Frontend: `npm run build` + lint on touched files
+- Incremental commits per completed chunk
+
 ## Phase 25 Breakdown (manageable chunks)
 
 **Phase:** 25 — Visual spacing + surface layering  

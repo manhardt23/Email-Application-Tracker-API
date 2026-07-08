@@ -351,3 +351,37 @@ def test_admin_dashboard_metrics_returns_200(db, live_client):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Phase 33 — link/unlink RBAC
+# ---------------------------------------------------------------------------
+
+
+def test_viewer_link_email_returns_403(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.post(
+        "/api/v1/emails/1/link",
+        json={"application_id": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_viewer_unlink_email_returns_403(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.post(
+        "/api/v1/emails/1/unlink",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_link_email_returns_404_for_missing_email(db, live_client):
+    token = _admin_token(db)
+    resp = live_client.post(
+        "/api/v1/emails/9999/link",
+        json={"application_id": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 404

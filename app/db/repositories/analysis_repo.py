@@ -32,6 +32,9 @@ class AnalysisRepository(BaseRepository):
     def link_to_application(self, analysis: EmailAnalysis, application_id: int) -> None:
         analysis.application_id = application_id
 
+    def unlink_from_application(self, analysis: EmailAnalysis) -> None:
+        analysis.application_id = None
+
     def get_needs_review(self) -> list[EmailAnalysis]:
         return (
             self.session.query(EmailAnalysis)
