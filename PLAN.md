@@ -1063,3 +1063,25 @@ Global baseline applies everywhere else via limiter `default_limits` — no per-
 | `app/api/v1/applications.py` | Expensive limit on list |
 | `tests/conftest.py` | Disable limiter in tests |
 | `tests/unit/test_rate_limit.py` | **New** — unit tests |
+
+## Phase 35 Breakdown (manageable chunks)
+
+**Phase:** 35 — Authenticated MCP server for Grok  
+**Branch:** `phase35-grok-mcp-auth` (from `phase34-job-finder-queue`)  
+**Already done:** JWT login for the API, job finder profile and stored suggestions  
+**This phase delivers:** A streamable HTTP MCP endpoint at `/mcp` that reuses the application and job-finder data. The client authenticates with `MCP_BEARER_TOKEN`, a long-lived secret from the environment or secrets manager. It is not a user JWT, it is not stored in the repo, and it does not expire when a login session ends. Missing or wrong credentials are rejected. There is no second login.
+
+### Tools
+
+- List applications (company, title, stage) and get one application
+- List, create, and update job suggestions
+- Get and update the job-finder profile
+
+Not exposed: email send/check, backfill, user admin, deletes, secret changes, or job-site logins.
+
+### Chunks
+
+1. Create and update one suggestion in the job-finder service (no xAI call)
+2. Mount the MCP server on the FastAPI app with the bearer check
+3. Tests: missing credential, wrong credential (including a login JWT), valid credential lists applications
+4. README: MCP URL and `Authorization: Bearer <credential>`

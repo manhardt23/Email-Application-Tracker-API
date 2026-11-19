@@ -74,6 +74,17 @@ The worker stays decoupled from API request/response flow and runs as a one-shot
 | POST | `/jobs/email-limit` | Set process-local worker fetch override (`1..1000`) |
 | GET | `/jobs/{job_id}` | Fetch worker run status + metrics |
 
+## MCP
+
+Grok (or any MCP client) calls a streamable HTTP endpoint on this app:
+
+- Local: `http://127.0.0.1:8000/mcp`
+- Deployed: `https://jemanhardt.dev/mcp`
+
+The client sends `Authorization: Bearer <credential>` on each request. The credential is the `MCP_BEARER_TOKEN` environment variable, or the same name in the secrets manager that injects environment variables on the host. It is not a user login and it is not a JWT from `POST /api/v1/auth/login`. It does not expire when a login session ends. The value is never stored in the repo. Leave it unset and every MCP call is rejected.
+
+A valid credential can list and get applications (company, title, stage), list, create, and update job suggestions, and get and update the job-finder profile. It cannot send or check email, run a backfill, manage users, delete records, change secrets, or store job-site logins.
+
 ## Repository Structure
 
 ```text
@@ -83,6 +94,7 @@ app/
 |- config.py
 |- logging_config.py
 |- api/v1/
+|- mcp/
 |- db/
 |  |- models.py
 |  |- database.py
@@ -127,6 +139,7 @@ docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 | `GROQ_MODEL` | `openai/gpt-oss-120b` (Groq model id; only used when `LLM_PROVIDER=groq`) |
 | `XAI_API_KEY` | Optional. xAI key for the job finder (separate from Groq). The page loads without it; search returns an error until it is set |
 | `XAI_MODEL` | Optional. xAI model for the job finder. Defaults to `grok-3` |
+| `MCP_BEARER_TOKEN` | Optional. Long-lived bearer for `/mcp`. Not a login JWT. Omit to reject every MCP call |
 
 ### Optional worker knobs
 
