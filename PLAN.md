@@ -1099,3 +1099,10 @@ Not exposed: email send/check, backfill, user admin, deletes, secret changes, or
 **Branch:** `cursor/phase38-fix-origin-502-dc83` (from `main`)  
 **Already done:** Phase 37 is on `main` and the deploy job succeeded. Nginx reload ran. The site still returns Cloudflare 502.  
 **This phase delivers:** One live nginx file (`tracker.conf`) that re-resolves the API container, a healthcheck so compose waits until `/api/v1/health` answers, and a deploy that overwrites host copies, deletes the extra conf, and prints API logs when that healthcheck fails.
+
+## Phase 39 Breakdown (manageable chunks)
+
+**Phase:** 39 — API exits because psycopg is not installed  
+**Branch:** `cursor/phase39-psycopg-driver-dc83` (from `main`)  
+**Already done:** The main deploy of the nginx fix printed the container traceback. SQLAlchemy 2.1 imports `psycopg` from `create_engine` and the image only had `psycopg2`.  
+**This phase delivers:** `psycopg[binary]` in the image dependencies, and a test that a `postgresql://` engine imports that driver.

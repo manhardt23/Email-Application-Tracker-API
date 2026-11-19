@@ -7,6 +7,10 @@ beautifulsoup4>=4.12.0
 ollama>=0.3.0
 groq>=0.11.0
 psycopg2-binary>=2.9.0
+# SQLAlchemy 2.1 maps postgresql:// to the psycopg v3 dialect and imports it
+# inside create_engine. The slim image has no system libpq, so the binary extra
+# is what makes `import psycopg` succeed at boot.
+psycopg[binary]>=3.1.0
 alembic>=1.13.0
 python-jose[cryptography]>=3.3.0
 bcrypt>=4.0.0
