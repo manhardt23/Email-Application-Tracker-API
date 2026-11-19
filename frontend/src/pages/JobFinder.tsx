@@ -6,65 +6,28 @@ import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
-import { Input, Textarea } from "../components/ui/Input";
+import { Input } from "../components/ui/Input";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
-import {
-  useFindJobs,
-  useJobSuggestions,
-  useQualificationProfile,
-  useSaveQualificationProfile,
-} from "../hooks/useFinder";
+import { useDismissSuggestion, useFindJobs, useJobSuggestions } from "../hooks/useFinder";
 import { errorMessage } from "../lib/format";
-import type { QualificationFit } from "../types/api";
-
-const FIT: Record<QualificationFit, { label: string; fg: string; bg: string; border: string }> = {
-  met: { label: "Met", fg: "#15803d", bg: "#eefcf2", border: "#bbf7d0" },
-  partial: { label: "Partial", fg: "#b45309", bg: "#fff7ea", border: "#fde68a" },
-  gap: { label: "Gap", fg: "#b91c1c", bg: "#fef2f2", border: "#fecaca" },
-};
-
-function FitTag({ fit }: { fit: QualificationFit }) {
-  const tone = FIT[fit] ?? FIT.gap;
-  return (
-    <span
-      className="inline-block shrink-0 rounded-full border px-[9px] py-[3px] text-[11px] font-medium"
-      style={{ color: tone.fg, backgroundColor: tone.bg, borderColor: tone.border }}
-    >
-      {tone.label}
-    </span>
-  );
-}
+import type { JobSuggestion } from "../types/api";
 
 export function JobFinder() {
-  const profile = useQualificationProfile();
   const suggestions = useJobSuggestions();
-  const save = useSaveQualificationProfile();
   const find = useFindJobs();
+  const dismiss = useDismissSuggestion();
   const toast = useToast();
-  const [titles, setTitles] = useState<string | null>(null);
-  const [skills, setSkills] = useState<string | null>(null);
   const [focus, setFocus] = useState("");
 
-  const titlesValue = titles ?? profile.data?.target_titles ?? "";
-  const skillsValue = skills ?? profile.data?.skills ?? "";
-  const busy = save.isPending || find.isPending;
-
-  function handleSave() {
-    save.mutate(
-      { target_titles: titlesValue, skills: skillsValue },
-      {
-        onSuccess: () => toast({ tone: "success", message: "Qualifications saved." }),
-        onError: (e) =>
-          toast({ tone: "error", message: errorMessage(e, "Could not save qualifications.") }),
-      },
-    );
-  }
-
   async function handleFind() {
+    const query = focus.trim();
+    if (!query) {
+      toast({ tone: "info", message: "Enter a search." });
+      return;
+    }
     try {
-      await save.mutateAsync({ target_titles: titlesValue, skills: skillsValue });
-      const result = await find.mutateAsync({ query: focus.trim() ? focus.trim() : null });
+      const result = await find.mutateAsync({ query });
       if (result.added.length === 0) {
         toast({
           tone: "info",
@@ -84,11 +47,19 @@ export function JobFinder() {
     }
   }
 
+  function handleDismiss(job: JobSuggestion) {
+    dismiss.mutate(job.id, {
+      onSuccess: () => toast({ tone: "success", message: "Suggestion dismissed." }),
+      onError: (e) =>
+        toast({ tone: "error", message: errorMessage(e, "Could not dismiss suggestion.") }),
+    });
+  }
+
   return (
     <>
       <PageHeader
         title="Job finder"
-        subtitle="Suggested roles you have not applied to, with pay, qualification fit, and the company apply page."
+        subtitle="Suggested roles you have not applied to, with pay and the company apply page."
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -99,7 +70,7 @@ export function JobFinder() {
           />
           <Input
             className="pl-9"
-            placeholder="Role or keywords (optional)"
+            placeholder="Role or keywords"
             value={focus}
             onChange={(e) => setFocus(e.target.value)}
             aria-label="Search focus"
@@ -111,55 +82,10 @@ export function JobFinder() {
             }}
           />
         </div>
-        <Button variant="primary" loading={busy} onClick={() => void handleFind()}>
+        <Button variant="primary" loading={find.isPending} onClick={() => void handleFind()}>
           Find jobs
         </Button>
       </div>
-
-      <Card className="mb-5">
-        <h2 className="text-[13px] font-semibold text-text">Your qualifications</h2>
-        <p className="mt-1 text-[12px] text-text-3">
-          Target titles and skills, separated by commas or new lines. Each card is marked met,
-          partial, or gap against this list.
-        </p>
-        {profile.isError ? (
-          <div className="mt-3">
-            <ErrorState error={profile.error} onRetry={() => profile.refetch()} />
-          </div>
-        ) : (
-          <>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="block text-[12px] text-text-2">
-                Target titles
-                <Textarea
-                  className="mt-1"
-                  rows={3}
-                  value={titlesValue}
-                  onChange={(e) => setTitles(e.target.value)}
-                  placeholder="Backend engineer, data analyst"
-                  disabled={profile.isLoading}
-                />
-              </label>
-              <label className="block text-[12px] text-text-2">
-                Skills
-                <Textarea
-                  className="mt-1"
-                  rows={3}
-                  value={skillsValue}
-                  onChange={(e) => setSkills(e.target.value)}
-                  placeholder="Python, SQL, FastAPI"
-                  disabled={profile.isLoading}
-                />
-              </label>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <Button variant="secondary" loading={save.isPending} onClick={handleSave}>
-                Save profile
-              </Button>
-            </div>
-          </>
-        )}
-      </Card>
 
       {suggestions.isLoading ? (
         <div className="space-y-3">
@@ -172,7 +98,7 @@ export function JobFinder() {
       ) : (suggestions.data ?? []).length === 0 ? (
         <EmptyState
           title="No suggested jobs."
-          description="Save your target titles and skills, then find roles. Jobs you already applied to stay off this list."
+          description="Search for roles. Jobs you already applied to, and suggestions you dismiss, stay off this list."
         />
       ) : (
         <div className="space-y-3">
@@ -180,10 +106,7 @@ export function JobFinder() {
             <Card key={job.id}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="truncate text-[14px] font-medium text-text">{job.title}</h3>
-                    <FitTag fit={job.qualification_fit} />
-                  </div>
+                  <h3 className="truncate text-[14px] font-medium text-text">{job.title}</h3>
                   <p className="mt-1 font-mono text-[12px] text-text-3">{job.company}</p>
                   {job.pay ? (
                     <p className="mt-2 text-[13px] text-text">{job.pay}</p>
@@ -207,6 +130,14 @@ export function JobFinder() {
                     Apply
                     <ExternalLink className="size-3.5" aria-hidden />
                   </a>
+                  <Button
+                    variant="secondary"
+                    loading={dismiss.isPending && dismiss.variables === job.id}
+                    onClick={() => handleDismiss(job)}
+                    aria-label={`Dismiss ${job.title} at ${job.company}`}
+                  >
+                    Dismiss
+                  </Button>
                 </div>
               </div>
             </Card>

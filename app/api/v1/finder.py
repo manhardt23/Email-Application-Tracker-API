@@ -1,4 +1,4 @@
-"""Job finder: qualification profile, stored suggestions, and the xAI search."""
+"""Job finder: stored suggestions and the xAI search."""
 
 from typing import Annotated
 
@@ -11,24 +11,16 @@ from app.auth.dependencies import AdminUser, get_db
 from app.config import get_settings
 from app.llm.errors import FinderError
 from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
-from app.services.job_finder import list_suggestions, profile_payload, save_profile, search_jobs
+from app.services.job_finder import (
+    SuggestionError,
+    dismiss_suggestion,
+    list_suggestions,
+    search_jobs,
+)
 
 router = APIRouter()
 
 DbDep = Annotated[Session, Depends(get_db)]
-
-
-class ProfileUpdate(BaseModel):
-    target_titles: str = ""
-    skills: str = ""
-
-    @field_validator("target_titles", "skills")
-    @classmethod
-    def _bounded(cls, value: str) -> str:
-        text = value.strip()
-        if len(text) > 4000:
-            raise ValueError("must be 4000 characters or fewer")
-        return text
 
 
 class SearchRequest(BaseModel):
@@ -47,19 +39,18 @@ class SearchRequest(BaseModel):
         return text
 
 
-@router.get("/profile")
-def get_qualification_profile(db: DbDep, _user: AdminUser):
-    return profile_payload(db)
-
-
-@router.put("/profile")
-def update_qualification_profile(body: ProfileUpdate, db: DbDep, _user: AdminUser):
-    return save_profile(db, target_titles=body.target_titles, skills=body.skills)
-
-
 @router.get("/suggestions")
 def get_suggestions(db: DbDep, _user: AdminUser):
     return list_suggestions(db)
+
+
+@router.post("/suggestions/{suggestion_id}/dismiss")
+def dismiss_suggestion_from_list(suggestion_id: int, db: DbDep, _user: AdminUser):
+    """Hide a suggestion. It leaves the list and is not created as an application."""
+    try:
+        return dismiss_suggestion(db, suggestion_id)
+    except SuggestionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/search")

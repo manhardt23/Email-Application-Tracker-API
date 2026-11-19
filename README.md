@@ -66,9 +66,8 @@ The worker stays decoupled from API request/response flow and runs as a one-shot
 | PUT | `/applications/{id}` | Update stage/notes |
 | GET | `/emails` | List processed emails |
 | GET | `/emails/review` | List low-confidence emails (API only; the review queue page is retired) |
-| GET | `/finder/profile` | Read the qualification profile (target titles and skills) |
-| PUT | `/finder/profile` | Update the qualification profile |
-| GET | `/finder/suggestions` | Suggested jobs, excluding roles already saved as applications |
+| GET | `/finder/suggestions` | Suggested jobs, excluding roles already saved as applications and dismissed suggestions |
+| POST | `/finder/suggestions/{id}/dismiss` | Hide a suggestion. It stays off the list and is not created as an application |
 | POST | `/finder/search` | Ask the xAI Grok finder for new suggestions |
 | POST | `/jobs/email-check` | Queue and trigger a worker run |
 | POST | `/jobs/email-limit` | Set process-local worker fetch override (`1..1000`) |
@@ -83,7 +82,7 @@ Grok (or any MCP client) calls a streamable HTTP endpoint on this app:
 
 The client sends `Authorization: Bearer <credential>` on each request. The credential is the `MCP_BEARER_TOKEN` environment variable, or the same name in the secrets manager that injects environment variables on the host. It is not a user login and it is not a JWT from `POST /api/v1/auth/login`. It does not expire when a login session ends. The value is never stored in the repo. Leave it unset and every MCP call is rejected.
 
-A valid credential can list and get applications (company, title, stage), list, create, and update job suggestions, and get and update the job-finder profile. It cannot send or check email, run a backfill, manage users, delete records, change secrets, or store job-site logins.
+A valid credential can list and get applications (company, title, stage) and list, create, and update job suggestions. It cannot read or save a job-finder profile, send or check email, run a backfill, manage users, delete records, change secrets, or store job-site logins.
 
 ## Repository Structure
 
@@ -237,6 +236,7 @@ Run SQL migrations only when attaching to existing persisted DB state.
 Get-Content "migrations/001_worker_run_queue_timestamps.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
 Get-Content "migrations/002_worker_run_last_processed_uid.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
 Get-Content "migrations/004_job_finder.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
+Get-Content "migrations/005_drop_finder_profile.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
 ```
 
 ### 4) Run worker one-shot

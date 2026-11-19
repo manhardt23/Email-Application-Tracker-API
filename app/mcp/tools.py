@@ -15,14 +15,10 @@ from app.services.job_finder import (
     SuggestionError,
     create_suggestion,
     list_suggestions,
-    profile_payload,
-    save_profile,
     update_suggestion,
 )
 
 session_factory: Callable[[], Session] = SessionLocal
-
-_PROFILE_LIMIT = 4000
 
 
 @contextmanager
@@ -41,13 +37,6 @@ def _iso(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat()
-
-
-def _profile_text(value: str, field: str) -> str:
-    text = value.strip()
-    if len(text) > _PROFILE_LIMIT:
-        raise ToolError(f"{field} must be {_PROFILE_LIMIT} characters or fewer")
-    return text
 
 
 def list_applications(limit: int = 1000, offset: int = 0) -> dict:
@@ -140,15 +129,3 @@ def update_job_suggestion(
             return update_suggestion(db, suggestion_id, changes)
         except SuggestionError as exc:
             raise ToolError(str(exc)) from exc
-
-
-def get_job_finder_profile() -> dict:
-    with session_scope() as db:
-        return profile_payload(db)
-
-
-def update_job_finder_profile(target_titles: str = "", skills: str = "") -> dict:
-    titles = _profile_text(target_titles, "target_titles")
-    skill_text = _profile_text(skills, "skills")
-    with session_scope() as db:
-        return save_profile(db, target_titles=titles, skills=skill_text)

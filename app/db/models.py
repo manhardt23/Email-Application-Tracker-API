@@ -202,28 +202,12 @@ class User(Base):
         return f"<User(id={self.id}, username='{self.username}', role='{self.role}')>"
 
 
-class QualificationProfile(Base):
-    """Single editable profile the job finder compares postings against."""
-
-    __tablename__ = "qualification_profiles"
-
-    id = Column(Integer, primary_key=True)
-    target_titles = Column(Text, nullable=False, default="", server_default="")
-    skills = Column(Text, nullable=False, default="", server_default="")
-    updated_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-        nullable=False,
-    )
-
-    def __repr__(self) -> str:
-        return f"<QualificationProfile(id={self.id})>"
-
-
 class JobSuggestion(Base):
-    """A role returned by the job finder. Fit is computed at read time."""
+    """A role returned by the job finder.
+
+    A dismissed row stays stored so a later search does not put it back on
+    the list. Dismissing one does not create an application.
+    """
 
     __tablename__ = "job_suggestions"
 
@@ -233,6 +217,7 @@ class JobSuggestion(Base):
     pay = Column(String(255), nullable=True)
     requirements_summary = Column(Text, nullable=False, default="", server_default="")
     apply_url = Column(String(2000), nullable=False)
+    dismissed = Column(Boolean, server_default=false(), default=False, nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
