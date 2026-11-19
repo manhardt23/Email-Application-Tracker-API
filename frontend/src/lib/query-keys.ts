@@ -29,5 +29,9 @@ export const queryKeys = {
     list: ["jobs", "list"] as const,
     status: (id: string) => ["jobs", "status", id] as const,
   },
+  finder: {
+    profile: ["finder", "profile"] as const,
+    suggestions: ["finder", "suggestions"] as const,
+  },
   stats: ["stats"] as const,
 };

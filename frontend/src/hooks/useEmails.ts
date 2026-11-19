@@ -22,26 +22,6 @@ export function useEmails(offset: number) {
   });
 }
 
-/** Dismiss clears needs_review so the email leaves the review queue. */
-export function useDismissEmail() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (emailId: number) =>
-      (await api.post<EmailRow>(`/emails/${emailId}/dismiss`)).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.emails.review });
-      qc.invalidateQueries({ queryKey: queryKeys.emails.all });
-    },
-  });
-}
-
-export function useEmailsForReview() {
-  return useQuery({
-    queryKey: queryKeys.emails.review,
-    queryFn: async () => (await api.get<EmailRow[]>("/emails/review")).data,
-  });
-}
-
 /** Promote invalidates emails + review + applications + dashboard (design contract). */
 export function usePromoteEmail() {
   const qc = useQueryClient();

@@ -8,7 +8,7 @@ const TITLES: { match: (path: string) => boolean; label: string }[] = [
   { match: (p) => p === "/", label: "Dashboard" },
   { match: (p) => p.startsWith("/applications"), label: "Applications" },
   { match: (p) => p.startsWith("/emails"), label: "Emails" },
-  { match: (p) => p.startsWith("/review"), label: "Review queue" },
+  { match: (p) => p.startsWith("/finder"), label: "Job finder" },
   { match: (p) => p.startsWith("/jobs"), label: "Jobs & workers" },
 ];
 

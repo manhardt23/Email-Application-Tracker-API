@@ -2,9 +2,9 @@ import { NavLink } from "react-router-dom";
 import {
   Briefcase,
   Cpu,
-  Inbox,
   LayoutDashboard,
   Mail,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -16,7 +16,7 @@ const PRIMARY: Item[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/applications", label: "Applications", icon: Briefcase },
   { to: "/emails", label: "Emails", icon: Mail },
-  { to: "/review", label: "Review queue", icon: Inbox },
+  { to: "/finder", label: "Job finder", icon: Search },
 ];
 
 const ADMIN: Item[] = [{ to: "/jobs", label: "Jobs & workers", icon: Cpu }];
