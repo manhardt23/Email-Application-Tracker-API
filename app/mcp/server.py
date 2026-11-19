@@ -17,7 +17,8 @@ from app.mcp.auth import credential_is_valid
 from app.middleware.rate_limit import limiter
 
 _INSTRUCTIONS = (
-    "Read applications and manage job suggestions plus the job-finder profile. "
+    "Read applications and manage job suggestions. "
+    "There is no job-finder profile and no fit score. "
     "Job-site logins are not available. "
     "This server cannot send or check email, run a backfill, manage users, "
     "delete records, or change secrets."
@@ -83,7 +84,10 @@ def build_mcp() -> FastMCP:
 
     @mcp.tool()
     def list_job_suggestions() -> dict:
-        """List stored job suggestions, hiding roles that match an application."""
+        """List stored job suggestions.
+
+        Hides roles that match an application and suggestions that were dismissed.
+        """
         return tool_impls.list_job_suggestions()
 
     @mcp.tool()
@@ -128,19 +132,6 @@ def build_mcp() -> FastMCP:
             requirements_summary=requirements_summary,
             apply_url=apply_url,
         )
-
-    @mcp.tool()
-    def get_job_finder_profile() -> dict:
-        """Read the job-finder profile: target titles and skills."""
-        return tool_impls.get_job_finder_profile()
-
-    @mcp.tool()
-    def update_job_finder_profile(
-        target_titles: Annotated[str, Field(description="Target job titles.")] = "",
-        skills: Annotated[str, Field(description="Skills to compare postings against.")] = "",
-    ) -> dict:
-        """Replace the job-finder profile. Both fields are saved as given."""
-        return tool_impls.update_job_finder_profile(target_titles=target_titles, skills=skills)
 
     return mcp
 

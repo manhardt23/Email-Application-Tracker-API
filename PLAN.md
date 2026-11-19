@@ -1106,3 +1106,10 @@ Not exposed: email send/check, backfill, user admin, deletes, secret changes, or
 **Branch:** `cursor/phase39-psycopg-driver-dc83` (from `main`)  
 **Already done:** The main deploy of the nginx fix printed the container traceback. SQLAlchemy 2.1 imports `psycopg` from `create_engine` and the image only had `psycopg2`.  
 **This phase delivers:** `psycopg[binary]` in the image dependencies, and a test that a `postgresql://` engine imports that driver.
+
+## Phase 40 Breakdown (manageable chunks)
+
+**Phase:** 40 — drop the editable job-finder profile
+**Branch:** `phase40-drop-finder-profile` (from `main`)
+**Already done:** The job finder stores suggestions and a qualification profile, and cards show met, partial, or gap against that profile.
+**This phase delivers:** No profile UI, API, or MCP tools, and no fit badge. Suggestions can be dismissed so they leave the list without becoming an application. Title, pay (or “No pay listed”), and the Apply link stay.

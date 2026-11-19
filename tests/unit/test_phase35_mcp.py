@@ -10,7 +10,6 @@ import pytest
 from fastapi.testclient import TestClient
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
-from mcp.server.fastmcp.exceptions import ToolError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -19,8 +18,8 @@ from app.auth.jwt_handler import create_access_token
 from app.config import get_settings
 from app.db.models import Application, Base, Company
 from app.main import create_app
+from app.mcp import tools as mcp_tools
 from app.mcp.auth import credential_is_valid
-from app.mcp.tools import update_job_finder_profile
 from app.services.job_finder import SuggestionError, create_suggestion, update_suggestion
 
 SECRET = "phase35-mcp-secret"
@@ -30,8 +29,6 @@ TOOL_NAMES = {
     "list_job_suggestions",
     "create_job_suggestion",
     "update_job_suggestion",
-    "get_job_finder_profile",
-    "update_job_finder_profile",
 }
 
 
@@ -126,9 +123,9 @@ def test_api_serves_when_mcp_token_unset_and_rate_limit_is_on(monkeypatch):
     assert credential_is_valid(f"Bearer {SECRET}") is False
 
 
-def test_profile_text_over_limit_is_rejected():
-    with pytest.raises(ToolError, match="4000"):
-        update_job_finder_profile(target_titles="x" * 4001)
+def test_profile_tools_are_not_registered():
+    assert not hasattr(mcp_tools, "get_job_finder_profile")
+    assert not hasattr(mcp_tools, "update_job_finder_profile")
 
 
 def test_create_rejects_bad_url_duplicate_and_existing_application(db):
@@ -230,16 +227,6 @@ def test_valid_credential_can_list_applications(mcp_secret, memory_session):
                         )
                         assert missing.isError is True
 
-                        profile = _payload(await session.call_tool("get_job_finder_profile", {}))
-                        assert profile == {"target_titles": "", "skills": ""}
-                        saved = _payload(
-                            await session.call_tool(
-                                "update_job_finder_profile",
-                                {"target_titles": "Engineer", "skills": "Python"},
-                            )
-                        )
-                        assert saved == {"target_titles": "Engineer", "skills": "Python"}
-
                         created = _payload(
                             await session.call_tool(
                                 "create_job_suggestion",
@@ -252,6 +239,7 @@ def test_valid_credential_can_list_applications(mcp_secret, memory_session):
                             )
                         )
                         assert created["company"] == "Initech"
+                        assert "qualification_fit" not in created
                         updated = _payload(
                             await session.call_tool(
                                 "update_job_suggestion",

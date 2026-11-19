@@ -331,13 +331,20 @@ def test_viewer_finder_suggestions_returns_403(db, live_client):
     assert resp.status_code == 403
 
 
-def test_admin_can_read_finder_profile(db, live_client):
+def test_finder_profile_routes_are_gone(db, live_client):
     token = _admin_token(db)
-    resp = live_client.get(
-        "/api/v1/finder/profile", headers={"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    assert live_client.get("/api/v1/finder/profile", headers=headers).status_code == 404
+    assert live_client.put("/api/v1/finder/profile", headers=headers, json={}).status_code == 404
+
+
+def test_viewer_cannot_dismiss_suggestion(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.post(
+        "/api/v1/finder/suggestions/1/dismiss",
+        headers={"Authorization": f"Bearer {token}"},
     )
-    assert resp.status_code == 200
-    assert resp.json() == {"target_titles": "", "skills": ""}
+    assert resp.status_code == 403
 
 
 def test_viewer_get_applications_returns_403(db, live_client):
