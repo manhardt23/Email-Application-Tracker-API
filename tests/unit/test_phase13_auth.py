@@ -323,6 +323,23 @@ def test_viewer_can_read_emails_review(db, live_client):
     assert resp.status_code == 200
 
 
+def test_viewer_finder_suggestions_returns_403(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.get(
+        "/api/v1/finder/suggestions", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_can_read_finder_profile(db, live_client):
+    token = _admin_token(db)
+    resp = live_client.get(
+        "/api/v1/finder/profile", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"target_titles": "", "skills": ""}
+
+
 def test_viewer_get_applications_returns_403(db, live_client):
     token = _viewer_token(db)
     resp = live_client.get("/api/v1/applications", headers={"Authorization": f"Bearer {token}"})
