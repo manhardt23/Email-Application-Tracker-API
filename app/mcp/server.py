@@ -14,6 +14,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.mcp import tools as tool_impls
 from app.mcp.auth import credential_is_valid
+from app.middleware.rate_limit import limiter
 
 _INSTRUCTIONS = (
     "Read applications and manage job suggestions plus the job-finder profile. "
@@ -28,6 +29,10 @@ class McpBearerMiddleware:
 
     def __init__(self, app: ASGIApp):
         self.app = app
+        # slowapi names the matched endpoint as module.__name__. An ASGI instance
+        # has no __name__, so a /mcp call raised AttributeError and returned 500
+        # before this bearer check could answer 401.
+        self.__name__ = "mcp_endpoint"
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -147,4 +152,8 @@ def protected_mcp_app(mcp: FastMCP) -> ASGIApp:
     The caller runs ``mcp.session_manager.run()`` in the FastAPI lifespan.
     """
     mcp.streamable_http_app()
-    return McpBearerMiddleware(StreamableHTTPASGIApp(mcp.session_manager))
+    endpoint = McpBearerMiddleware(StreamableHTTPASGIApp(mcp.session_manager))
+    # Register the name only. exempt() also returns a sync wrapper, which
+    # Starlette would treat as a request function instead of this ASGI app.
+    limiter.exempt(endpoint)
+    return endpoint

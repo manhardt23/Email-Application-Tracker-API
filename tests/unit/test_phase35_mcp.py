@@ -92,6 +92,40 @@ def test_unconfigured_secret_rejects_every_call(monkeypatch):
     get_settings.cache_clear()
 
 
+def test_api_serves_when_mcp_token_unset_and_rate_limit_is_on(monkeypatch):
+    """Production leaves the limiter on. conftest turns it off, which hid a 500.
+
+    slowapi looks up endpoint.__name__ before the bearer check. The MCP ASGI
+    app had none, so /mcp returned 500 while the token was unset. Startup must
+    not require MCP_BEARER_TOKEN: /mcp is 401 and the rest of the API still serves.
+    """
+    from app.middleware.rate_limit import limiter
+
+    monkeypatch.delenv("MCP_BEARER_TOKEN", raising=False)
+    get_settings.cache_clear()
+    previous = limiter.enabled
+    limiter.enabled = True
+    try:
+        app = create_app()
+        with TestClient(app) as client:
+            health = client.get("/api/v1/health")
+            missing = client.post("/mcp")
+            presented = client.post("/mcp", headers=_auth(SECRET))
+            still_up = client.get("/api/v1/health")
+    finally:
+        limiter.enabled = previous
+        get_settings.cache_clear()
+
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    for response in (missing, presented):
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid or missing MCP credential"
+        assert response.headers["www-authenticate"] == "Bearer"
+    assert still_up.status_code == 200
+    assert credential_is_valid(f"Bearer {SECRET}") is False
+
+
 def test_profile_text_over_limit_is_rejected():
     with pytest.raises(ToolError, match="4000"):
         update_job_finder_profile(target_titles="x" * 4001)
