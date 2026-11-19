@@ -27,10 +27,15 @@ class Settings(BaseSettings):
     # Database
     database_url: str
 
-    # LLM — set to "groq" for production, "ollama" for local dev
+    # LLM — set to "groq" for production, "ollama" for local dev.
+    # Email classification uses Groq. The job finder uses xAI Grok (XAI_API_KEY),
+    # and the API still starts when that key is absent.
     llm_provider: str = "groq"
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    xai_api_key: str | None = None
+    xai_model: str = "grok-3"
+    xai_base_url: str = "https://api.x.ai/v1"
 
     # JWT — set JWT_SECRET to a long random string in production
     jwt_secret: str = "changeme"
@@ -75,11 +80,13 @@ class Settings(BaseSettings):
     def safe_summary(self) -> str:
         """Return a one-line config summary safe to log (no secrets)."""
         model_part = f" groq_model={self.groq_model}" if self.llm_provider == "groq" else ""
+        xai_configured = "yes" if (self.xai_api_key or "").strip() else "no"
         return (
             f"provider={self.llm_provider}{model_part} imap_server={self.imap_server} "
             f"imap_timeout={self.imap_timeout_seconds}s "
             f"email_limit={self.email_limit} max_emails={self.max_emails_per_run} "
-            f"stale_ttl={self.stale_run_ttl_minutes}m"
+            f"stale_ttl={self.stale_run_ttl_minutes}m "
+            f"xai_configured={xai_configured}"
         )
 
 

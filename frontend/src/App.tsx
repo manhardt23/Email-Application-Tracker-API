@@ -7,9 +7,9 @@ import { Applications } from "./pages/Applications";
 import { Dashboard } from "./pages/Dashboard";
 import { Emails } from "./pages/Emails";
 import { Forbidden } from "./pages/Forbidden";
+import { JobFinder } from "./pages/JobFinder";
 import { JobsAdmin } from "./pages/JobsAdmin";
 import { Login } from "./pages/Login";
-import { ReviewQueue } from "./pages/ReviewQueue";
 
 export default function App() {
   return (
@@ -55,7 +55,14 @@ export default function App() {
             </RequireAdmin>
           }
         />
-        <Route path="review" element={<ReviewQueue />} />
+        <Route
+          path="finder"
+          element={
+            <RequireAdmin>
+              <JobFinder />
+            </RequireAdmin>
+          }
+        />
         <Route
           path="jobs"
           element={

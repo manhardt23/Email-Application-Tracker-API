@@ -65,7 +65,11 @@ The worker stays decoupled from API request/response flow and runs as a one-shot
 | GET | `/applications/{id}` | Fetch a single application |
 | PUT | `/applications/{id}` | Update stage/notes |
 | GET | `/emails` | List processed emails |
-| GET | `/emails/review` | List emails requiring review |
+| GET | `/emails/review` | List low-confidence emails (API only; the review queue page is retired) |
+| GET | `/finder/profile` | Read the qualification profile (target titles and skills) |
+| PUT | `/finder/profile` | Update the qualification profile |
+| GET | `/finder/suggestions` | Suggested jobs, excluding roles already saved as applications |
+| POST | `/finder/search` | Ask the xAI Grok finder for new suggestions |
 | POST | `/jobs/email-check` | Queue and trigger a worker run |
 | POST | `/jobs/email-limit` | Set process-local worker fetch override (`1..1000`) |
 | GET | `/jobs/{job_id}` | Fetch worker run status + metrics |
@@ -121,6 +125,8 @@ docker run --rm --env-file /etc/tracker.env <IMAGE> python -m app.worker
 | `LLM_PROVIDER` | `groq` or `ollama` |
 | `GROQ_API_KEY` | Required when `LLM_PROVIDER=groq` |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` (Groq model id; only used when `LLM_PROVIDER=groq`) |
+| `XAI_API_KEY` | Optional. xAI key for the job finder (separate from Groq). The page loads without it; search returns an error until it is set |
+| `XAI_MODEL` | Optional. xAI model for the job finder. Defaults to `grok-3` |
 
 ### Optional worker knobs
 
@@ -217,6 +223,7 @@ Run SQL migrations only when attaching to existing persisted DB state.
 ```powershell
 Get-Content "migrations/001_worker_run_queue_timestamps.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
 Get-Content "migrations/002_worker_run_last_processed_uid.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
+Get-Content "migrations/004_job_finder.sql" | docker compose exec -T db psql -U job_tracker_user -d job_tracker
 ```
 
 ### 4) Run worker one-shot

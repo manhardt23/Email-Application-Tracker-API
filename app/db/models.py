@@ -200,3 +200,45 @@ class User(Base):
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}', role='{self.role}')>"
+
+
+class QualificationProfile(Base):
+    """Single editable profile the job finder compares postings against."""
+
+    __tablename__ = "qualification_profiles"
+
+    id = Column(Integer, primary_key=True)
+    target_titles = Column(Text, nullable=False, default="", server_default="")
+    skills = Column(Text, nullable=False, default="", server_default="")
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<QualificationProfile(id={self.id})>"
+
+
+class JobSuggestion(Base):
+    """A role returned by the job finder. Fit is computed at read time."""
+
+    __tablename__ = "job_suggestions"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(500), nullable=False)
+    company_name = Column(String(255), nullable=False, index=True)
+    pay = Column(String(255), nullable=True)
+    requirements_summary = Column(Text, nullable=False, default="", server_default="")
+    apply_url = Column(String(2000), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<JobSuggestion(id={self.id}, title='{self.title}', company='{self.company_name}')>"
