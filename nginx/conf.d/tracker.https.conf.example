@@ -1,3 +1,7 @@
+# Example only. nginx includes conf.d/*.conf, and a second file that also
+# sets server_name jemanhardt.dev is ignored. The live file is tracker.conf.
+# Do not copy this into conf.d under another .conf name.
+
 server {
     listen 80;
     server_name jemanhardt.dev www.jemanhardt.dev;

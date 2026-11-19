@@ -27,6 +27,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
     restart: unless-stopped
 
   nginx:
@@ -38,7 +50,8 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
