@@ -326,7 +326,10 @@ def run(
                     company = company_repo.find_or_create(company_name)
                     application = app_repo.find_or_create(company.id, position_name)
                     analysis_repo.link_to_application(analysis, application.id)
-                    app_repo.update_stage(application, email_data.stage, email_data.date)
+                    # A missing Date header used to skip the stage write, so a
+                    # rejection stayed "applied". Use the same timestamp stored
+                    # on the email row.
+                    app_repo.update_stage(application, email_data.stage, received)
 
             session.commit()
             saved += 1
