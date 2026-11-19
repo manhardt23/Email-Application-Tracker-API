@@ -123,3 +123,7 @@ jobs:
             docker builder prune -af
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml pull
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # The API container is recreated and gets a new address. Nginx resolves
+            # `api` when its config loads and is left running, so reload it or the
+            # origin keeps proxying to the previous address and answers 502.
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload

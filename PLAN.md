@@ -1085,3 +1085,10 @@ Not exposed: email send/check, backfill, user admin, deletes, secret changes, or
 2. Mount the MCP server on the FastAPI app with the bearer check
 3. Tests: missing credential, wrong credential (including a login JWT), valid credential lists applications
 4. README: MCP URL and `Authorization: Bearer <credential>`
+
+## Phase 37 Breakdown (manageable chunks)
+
+**Phase:** 37 — API boot crash after the MCP deploy  
+**Branch:** `phase37-api-boot-crash` (from `main`)  
+**Already done:** Job finder and `/mcp` are on `main`. CI deployed that image. `MCP_BEARER_TOKEN` is optional and startup only logs when it is unset.  
+**This phase delivers:** The API keeps serving when `MCP_BEARER_TOKEN` is unset. `/mcp` returns 401. The rate limiter must not turn that route into a 500. Deploy reloads nginx after the API container is recreated so the origin does not keep the previous API address.
