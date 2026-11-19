@@ -43,6 +43,62 @@ const CLASSIFICATION: Record<string, Omit<Swatch, "border">> = {
   unprocessed: { label: "Unprocessed", fg: "#8a8580", bg: "#fafaf9" },
 };
 
+/** Map a free-text stage onto the labels the emails list filters on. */
+export function canonicalStage(stage: string | null | undefined): string | null {
+  const value = (stage ?? "").trim().toLowerCase();
+  if (!value || value === "null" || value === "none" || value === "n/a") return null;
+  if (["applied", "rejected", "interview", "offer", "assessment", "other"].includes(value)) {
+    return value;
+  }
+  if (/reject|declin|not selected|not moving forward|unsuccessful|other candidates/.test(value)) {
+    return "rejected";
+  }
+  if (/\boffer\b/.test(value)) return "offer";
+  if (/assess|take-home|take home|coding challenge|hackerrank|codility/.test(value)) {
+    return "assessment";
+  }
+  if (/interview|phone screen|on-?site|screening/.test(value)) return "interview";
+  if (/\bappl|\breceived\b|\bsubmitted\b|under review/.test(value)) return "applied";
+  return null;
+}
+
+/**
+ * Stage implied by a subject line. The promote form cannot see the body;
+ * the API still reads the stored body and replaces a default "applied".
+ */
+export function inferStageFromText(text: string | null | undefined): string | null {
+  const value = (text ?? "").toLowerCase();
+  if (!value.trim()) return null;
+  if (
+    /regret to inform|not moving forward|other candidates|not selected|position has been filled|no longer considered/.test(
+      value,
+    )
+  ) {
+    return "rejected";
+  }
+  if (/offer letter|offer of employment|job offer|extend an offer|pleased to extend/.test(value)) {
+    return "offer";
+  }
+  if (/coding challenge|take-home|technical assessment|online assessment/.test(value)) {
+    return "assessment";
+  }
+  if (
+    /interview invitation|invitation to interview|phone screen|your interview|onsite interview|on-site interview/.test(
+      value,
+    )
+  ) {
+    return "interview";
+  }
+  if (
+    /thank you for applying|thanks for applying|thank you for your application|received your application|application was sent|you applied to|application received|application status/.test(
+      value,
+    )
+  ) {
+    return "applied";
+  }
+  return null;
+}
+
 /** Derive a classification tag for an email from its analysis fields. */
 export function classifyEmail(email: EmailRow): Omit<Swatch, "border"> {
   if (email.is_application === null || email.is_application === undefined) {
@@ -50,7 +106,7 @@ export function classifyEmail(email: EmailRow): Omit<Swatch, "border"> {
   }
   if (email.needs_review) return CLASSIFICATION.needs_review;
   if (email.is_application === false) return CLASSIFICATION.not_relevant;
-  const stage = (email.detected_stage ?? "").toLowerCase();
+  const stage = canonicalStage(email.detected_stage) ?? "";
   if (stage === "interview" || stage === "assessment") return CLASSIFICATION.interview_invite;
   if (stage === "offer") return CLASSIFICATION.offer;
   if (stage === "rejected") return CLASSIFICATION.rejection;

@@ -79,8 +79,31 @@ class TestNormalizeClassification:
         )
         assert result.stage is None
 
-    def test_numeric_stage_cast_to_string(self):
+    def test_unrecognized_stage_is_dropped(self):
         result = normalize_classification(
             {"is_application": True, "stage": 3, "confidence": "medium"}
         )
-        assert result.stage == "3"
+        assert result.stage is None
+
+    def test_stage_synonyms_map_to_canonical_values(self):
+        rejected = normalize_classification(
+            {"is_application": True, "stage": "Application rejected", "confidence": "high"}
+        )
+        interview = normalize_classification(
+            {"is_application": True, "stage": "Interview Scheduled", "confidence": "high"}
+        )
+        assert rejected.stage == "rejected"
+        assert interview.stage == "interview"
+
+    def test_null_string_company_and_position_become_none(self):
+        result = normalize_classification(
+            {
+                "is_application": True,
+                "company": "null",
+                "position": "N/A",
+                "stage": "applied",
+                "confidence": "high",
+            }
+        )
+        assert result.company is None
+        assert result.position is None

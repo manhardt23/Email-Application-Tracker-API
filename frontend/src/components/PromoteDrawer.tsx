@@ -3,13 +3,23 @@ import { useNavigate } from "react-router-dom";
 
 import { usePromoteEmail } from "../hooks/useEmails";
 import { errorMessage, formatDateTime } from "../lib/format";
-import { STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
+import { inferStageFromText, STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
 import type { EmailRow } from "../types/api";
 import { Button } from "./ui/Button";
 import { Drawer } from "./ui/Drawer";
 import { Input } from "./ui/Input";
 import { Select } from "./ui/Select";
 import { useToast } from "./ui/Toast";
+
+function initialPromoteStage(email: EmailRow): string {
+  const detected = (email.detected_stage ?? "").trim().toLowerCase();
+  const known = (STAGE_OPTIONS as readonly string[]).includes(detected) ? detected : null;
+  const fromSubject = inferStageFromText(email.subject);
+  const detectedIsGeneric = known === null || known === "applied" || known === "other";
+  if (fromSubject && fromSubject !== "applied" && detectedIsGeneric) return fromSubject;
+  if (known) return known;
+  return fromSubject ?? "applied";
+}
 
 export function PromoteDrawer({
   email,
@@ -30,7 +40,7 @@ export function PromoteDrawer({
       setForm({
         company_name: email.detected_company ?? "",
         position: email.detected_position ?? "",
-        stage: (email.detected_stage ?? "applied").toLowerCase(),
+        stage: initialPromoteStage(email),
       });
       promote.reset();
     }
@@ -156,7 +166,10 @@ export function PromoteDrawer({
             </Select>
           </div>
 
-          <p className="text-[12px] text-text-3">Fields are editable before promoting.</p>
+          <p className="text-[12px] text-text-3">
+            Fields are editable before promoting. A rejection, interview, assessment, or offer in
+            the email replaces a default Applied status.
+          </p>
         </div>
       ) : null}
     </Drawer>
