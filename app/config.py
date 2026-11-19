@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 1440
 
+    # MCP — long-lived bearer for the Grok client. Not a user JWT and not a login.
+    # Set MCP_BEARER_TOKEN in the environment or the secrets manager. Never commit it.
+    # Empty means every MCP call is rejected. The value does not expire with a session.
+    mcp_bearer_token: str | None = None
+
     # Rate limiting (slowapi) — per-IP for public/login, per-user when authenticated
     rate_limit_enabled: bool = True
     rate_limit_login: str = "10/minute"
@@ -77,16 +82,25 @@ class Settings(BaseSettings):
             raise ValueError("STALE_RUN_TTL_MINUTES must be a positive integer")
         return v
 
+    @field_validator("mcp_bearer_token")
+    @classmethod
+    def _strip_mcp_token(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = value.strip()
+        return text or None
+
     def safe_summary(self) -> str:
         """Return a one-line config summary safe to log (no secrets)."""
         model_part = f" groq_model={self.groq_model}" if self.llm_provider == "groq" else ""
         xai_configured = "yes" if (self.xai_api_key or "").strip() else "no"
+        mcp_configured = "yes" if self.mcp_bearer_token else "no"
         return (
             f"provider={self.llm_provider}{model_part} imap_server={self.imap_server} "
             f"imap_timeout={self.imap_timeout_seconds}s "
             f"email_limit={self.email_limit} max_emails={self.max_emails_per_run} "
             f"stale_ttl={self.stale_run_ttl_minutes}m "
-            f"xai_configured={xai_configured}"
+            f"xai_configured={xai_configured} mcp_configured={mcp_configured}"
         )
 
 
