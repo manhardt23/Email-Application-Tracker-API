@@ -1092,3 +1092,10 @@ Not exposed: email send/check, backfill, user admin, deletes, secret changes, or
 **Branch:** `phase37-api-boot-crash` (from `main`)  
 **Already done:** Job finder and `/mcp` are on `main`. CI deployed that image. `MCP_BEARER_TOKEN` is optional and startup only logs when it is unset.  
 **This phase delivers:** The API keeps serving when `MCP_BEARER_TOKEN` is unset. `/mcp` returns 401. The rate limiter must not turn that route into a 500. Deploy reloads nginx after the API container is recreated so the origin does not keep the previous API address.
+
+## Phase 38 Breakdown (manageable chunks)
+
+**Phase:** 38 — origin still 502 after the green main deploy  
+**Branch:** `cursor/phase38-fix-origin-502-dc83` (from `main`)  
+**Already done:** Phase 37 is on `main` and the deploy job succeeded. Nginx reload ran. The site still returns Cloudflare 502.  
+**This phase delivers:** One live nginx file (`tracker.conf`) that re-resolves the API container, a healthcheck so compose waits until `/api/v1/health` answers, and a deploy that overwrites host copies, deletes the extra conf, and prints API logs when that healthcheck fails.

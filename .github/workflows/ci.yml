@@ -85,6 +85,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           source: "docker-compose.prod.yml"
           target: "~/deploy/"
+          overwrite: true
 
       - name: Copy nginx config to EC2 deploy dir
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634
@@ -94,6 +95,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           source: "nginx/**"
           target: "~/deploy/"
+          overwrite: true
 
       - name: Pull and restart stack on EC2
         uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17
@@ -117,13 +119,22 @@ jobs:
             else
               printf '\nTRACKER_IMAGE=%s\n' "$TRACKER_IMAGE" >> .env
             fi
+            # The host already has tracker.conf. A second *.conf for the same
+            # server_name is ignored, which is what the last reload logged.
+            find nginx/conf.d -maxdepth 1 -type f ! -name tracker.conf -delete
+            test -f nginx/conf.d/tracker.conf
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
             docker container prune -f
             docker image prune -af
             docker builder prune -af
             TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml pull
-            TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            # The API container is recreated and gets a new address. Nginx resolves
-            # `api` when its config loads and is left running, so reload it or the
-            # origin keeps proxying to the previous address and answers 502.
-            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload
+            if ! TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans; then
+              docker compose -f docker-compose.prod.yml ps -a
+              docker compose -f docker-compose.prod.yml logs --tail=200 api
+              exit 1
+            fi
+            docker compose -f docker-compose.prod.yml ps -a
+            docker compose -f docker-compose.prod.yml logs --tail=80 api
+            # Nginx is left running across API recreates. Start it again only
+            # after the API healthcheck has passed, with the single tracker.conf.
+            TRACKER_IMAGE="$TRACKER_IMAGE" docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate nginx
