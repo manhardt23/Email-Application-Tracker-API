@@ -292,19 +292,25 @@ def apply_suggestion(session: Session, suggestion_id: int) -> dict:
     if row is None:
         raise SuggestionError("Suggestion not found")
 
-    company = CompanyRepository(session).find_or_create(row.company_name)
-    applications = ApplicationRepository(session)
-    existing = applications.find_by_company_and_position(company.id, row.title)
-    application = applications.find_or_create(company.id, row.title)
-    created = existing is None
+    # Same company and title normalization as email linking: punctuation and
+    # case variants are the existing application, not a second row.
+    from app.services.application_matcher import match_or_create_application
+
+    application, created = match_or_create_application(
+        CompanyRepository(session),
+        ApplicationRepository(session),
+        row.company_name,
+        row.title,
+    )
     if created:
         application.notes = _posting_notes(row.apply_url, row.pay)
 
     session.commit()
     session.refresh(application)
+    company_name = application.company.name if application.company is not None else row.company_name
     return {
         "application_id": application.id,
-        "company": company.name,
+        "company": company_name,
         "position": application.position,
         "stage": application.stage,
         "created": created,

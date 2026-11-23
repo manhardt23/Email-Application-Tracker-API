@@ -281,12 +281,6 @@ class TestGrayMail:
     _SUBJECT = "Document"
     _BODY = "Attached is the resume."
 
-    @pytest.mark.xfail(
-        reason=(
-            "Expected a resume-only email to reach the model. "
-            "quick_filter returned False and skipped it."
-        )
-    )
     def test_weak_keyword_mail_goes_to_the_model(self):
         assert quick_filter(self._SENDER, self._SUBJECT, self._BODY) is True
         email = _mail(self._SENDER, self._SUBJECT, self._BODY, uid="gray")
@@ -309,13 +303,6 @@ class TestGrayMail:
         )
         assert overridden is None or overridden.is_application is False
 
-    @pytest.mark.xfail(
-        reason=(
-            "Expected a model yes on resume-only mail to stand. "
-            "quick_filter returned False, so classify() stored is_application False "
-            "and never called the model."
-        )
-    )
     def test_weak_keyword_mail_keeps_a_model_yes(self):
         email = _mail(self._SENDER, self._SUBJECT, self._BODY, uid="gray-yes")
         classifier = _Scripted(_model(True, "applied"))

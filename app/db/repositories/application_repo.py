@@ -6,6 +6,8 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from app.db.models import Application, Company, EmailAnalysis
 from app.db.repositories.base import BaseRepository
+from app.email_client.application_signals import stage_rank
+from app.llm.normalization import canonicalize_stage
 
 
 def _with_company(query):
@@ -110,6 +112,13 @@ class ApplicationRepository(BaseRepository):
             if application.last_updated.tzinfo
             else application.last_updated
         )
-        if date_naive > last_updated_naive:
-            application.stage = new_stage
-            application.last_updated = date_naive
+        if date_naive <= last_updated_naive:
+            return
+        # A newer "applied" must not walk an interview or offer backwards.
+        # A newer rejection still wins: it outranks every other stage.
+        current = canonicalize_stage(application.stage) or application.stage
+        chosen = canonicalize_stage(new_stage) or new_stage
+        if chosen != "rejected" and stage_rank(chosen) < stage_rank(current):
+            return
+        application.stage = new_stage
+        application.last_updated = date_naive
