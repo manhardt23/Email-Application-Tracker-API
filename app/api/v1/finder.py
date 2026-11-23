@@ -13,6 +13,7 @@ from app.llm.errors import FinderError
 from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
 from app.services.job_finder import (
     SuggestionError,
+    apply_suggestion,
     dismiss_suggestion,
     list_suggestions,
     search_jobs,
@@ -49,6 +50,15 @@ def dismiss_suggestion_from_list(suggestion_id: int, db: DbDep, _user: AdminUser
     """Hide a suggestion. It leaves the list and is not created as an application."""
     try:
         return dismiss_suggestion(db, suggestion_id)
+    except SuggestionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/suggestions/{suggestion_id}/apply")
+def apply_suggestion_to_applications(suggestion_id: int, db: DbDep, _user: AdminUser):
+    """Create an application from a suggestion. Does not dismiss the suggestion."""
+    try:
+        return apply_suggestion(db, suggestion_id)
     except SuggestionError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

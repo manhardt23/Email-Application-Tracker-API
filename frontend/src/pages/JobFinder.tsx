@@ -9,7 +9,12 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Input } from "../components/ui/Input";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
-import { useDismissSuggestion, useFindJobs, useJobSuggestions } from "../hooks/useFinder";
+import {
+  useApplySuggestion,
+  useDismissSuggestion,
+  useFindJobs,
+  useJobSuggestions,
+} from "../hooks/useFinder";
 import { errorMessage } from "../lib/format";
 import type { JobSuggestion } from "../types/api";
 
@@ -17,6 +22,7 @@ export function JobFinder() {
   const suggestions = useJobSuggestions();
   const find = useFindJobs();
   const dismiss = useDismissSuggestion();
+  const apply = useApplySuggestion();
   const toast = useToast();
   const [focus, setFocus] = useState("");
 
@@ -52,6 +58,14 @@ export function JobFinder() {
       onSuccess: () => toast({ tone: "success", message: "Suggestion dismissed." }),
       onError: (e) =>
         toast({ tone: "error", message: errorMessage(e, "Could not dismiss suggestion.") }),
+    });
+  }
+
+  function handleApply(job: JobSuggestion) {
+    apply.mutate(job.id, {
+      onSuccess: () => toast({ tone: "success", message: "Added to applications." }),
+      onError: (e) =>
+        toast({ tone: "error", message: errorMessage(e, "Could not add to applications.") }),
     });
   }
 
@@ -130,6 +144,14 @@ export function JobFinder() {
                     Apply
                     <ExternalLink className="size-3.5" aria-hidden />
                   </a>
+                  <Button
+                    variant="secondary"
+                    loading={apply.isPending && apply.variables === job.id}
+                    onClick={() => handleApply(job)}
+                    aria-label={`Add ${job.title} at ${job.company} to applications`}
+                  >
+                    Add to applications
+                  </Button>
                   <Button
                     variant="secondary"
                     loading={dismiss.isPending && dismiss.variables === job.id}

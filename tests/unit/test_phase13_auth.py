@@ -347,6 +347,15 @@ def test_viewer_cannot_dismiss_suggestion(db, live_client):
     assert resp.status_code == 403
 
 
+def test_viewer_cannot_apply_suggestion(db, live_client):
+    token = _viewer_token(db)
+    resp = live_client.post(
+        "/api/v1/finder/suggestions/1/apply",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+
+
 def test_viewer_get_applications_returns_403(db, live_client):
     token = _viewer_token(db)
     resp = live_client.get("/api/v1/applications", headers={"Authorization": f"Bearer {token}"})
