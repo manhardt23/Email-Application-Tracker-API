@@ -309,20 +309,7 @@ def test_dashboard_recent_applications_returns_ordered_records(client, db):
     assert "date_applied" in payload[0]
 
 
-def test_dashboard_top_companies_returns_ranked_counts(client, db):
-    _seed_application(db, stage="applied", company_name="A Corp")
-    _seed_application(db, stage="interview", company_name="B Corp")
-    _seed_application_with_dates(
-        db,
-        stage="offer",
-        company_name="B Corp",
-        position="Platform Engineer",
-    )
+def test_dashboard_top_companies_route_is_removed(client):
+    resp = client.get("/api/v1/dashboard/top-companies")
 
-    resp = client.get("/api/v1/dashboard/top-companies?limit=2")
-
-    assert resp.status_code == 200
-    payload = resp.json()
-    assert len(payload) == 2
-    assert payload[0]["company"] == "B Corp"
-    assert payload[0]["applications"] == 2
+    assert resp.status_code == 404
