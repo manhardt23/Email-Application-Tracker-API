@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "../lib/utils";
+import { BrandMark } from "./BrandMark";
 
 type Item = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
@@ -47,12 +48,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col gap-1 px-3.5 py-[18px]">
       <div className="mb-4 flex items-center gap-2.5 px-1">
-        <div
-          className="flex size-[26px] items-center justify-center rounded-[5px] border-[1.5px] border-text text-[13px] font-bold text-text"
-          aria-hidden
-        >
-          A
-        </div>
+        <BrandMark />
         <div className="leading-tight">
           <div className="text-[14px] font-semibold text-text">App Tracker</div>
           <div className="font-mono text-[11px] text-text-3">v0.1.0</div>
