@@ -7,10 +7,12 @@ export const queryKeys = {
   dashboard: {
     all: ["dashboard"] as const,
     metrics: ["dashboard", "metrics"] as const,
-    overTime: (days: number) => ["dashboard", "applications-over-time", days] as const,
+    glance: ["dashboard", "glance"] as const,
+    overTime: (days: number, granularity: string) =>
+      ["dashboard", "applications-over-time", days, granularity] as const,
     statusBreakdown: ["dashboard", "status-breakdown"] as const,
+    roles: ["dashboard", "role-breakdown"] as const,
     recent: ["dashboard", "recent-applications"] as const,
-    topCompanies: ["dashboard", "top-companies"] as const,
   },
   applications: {
     all: ["applications"] as const,
