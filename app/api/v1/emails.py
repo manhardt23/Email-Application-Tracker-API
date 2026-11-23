@@ -12,13 +12,16 @@ from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
 from app.llm.base import EmailClassification
 from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
+from app.services.application_matcher import (
+    UNKNOWN_COMPANY,
+    UNKNOWN_POSITION,
+    match_or_create_application,
+)
 
 router = APIRouter()
 
 
 DbDep = Annotated[Session, Depends(get_db)]
-UNKNOWN_COMPANY = "Unknown Company"
-UNKNOWN_POSITION = "Unknown Position"
 DEFAULT_STAGE = "applied"
 
 
@@ -137,10 +140,12 @@ def promote_email_to_application(
     app_repo = ApplicationRepository(db)
     analysis_repo = AnalysisRepository(db)
 
-    company = company_repo.find_or_create(company_name)
-    existing = app_repo.find_by_company_and_position(company.id, position_name)
-    created = existing is None
-    application = existing or app_repo.find_or_create(company.id, position_name)
+    application, created = match_or_create_application(
+        company_repo,
+        app_repo,
+        company_name,
+        position_name,
+    )
 
     if stage_value:
         application.stage = stage_value
@@ -172,11 +177,12 @@ def promote_email_to_application(
     db.commit()
     db.refresh(application)
 
+    stored_company = application.company.name if application.company is not None else company_name
     return {
         "email_id": email.id,
         "application_id": application.id,
         "created": created,
-        "company_name": company.name,
+        "company_name": stored_company,
         "position": application.position,
         "stage": application.stage,
     }

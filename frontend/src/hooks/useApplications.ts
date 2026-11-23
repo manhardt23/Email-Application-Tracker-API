@@ -57,3 +57,21 @@ export function useUpdateApplication(id: number) {
     },
   });
 }
+
+export function useDeleteApplication(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await api.delete(`/applications/${id}`);
+    },
+    onSuccess: () => {
+      // Drop in-flight detail reads so deleting does not refetch a row that is gone.
+      qc.cancelQueries({ queryKey: queryKeys.applications.detail(id) });
+      qc.cancelQueries({ queryKey: queryKeys.applications.emails(id) });
+      qc.invalidateQueries({
+        queryKey: queryKeys.applications.all,
+        refetchType: "none",
+      });
+    },
+  });
+}
