@@ -9,6 +9,7 @@ All DB and IMAP interactions are mocked. Tests focus on:
 - run() returns EXIT_PIPELINE on unexpected exception and marks run failed
 """
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from app.services.worker_runtime import clear_max_emails_override, set_max_emails_override
@@ -362,3 +363,58 @@ def test_backfill_run_uses_date_window_and_does_not_advance_cursor(mock_gs):
         to_date=to_date,
     )
     assert infra["run_obj"].last_processed_uid == 55
+
+
+@patch("app.worker.get_settings")
+def test_run_applies_stage_when_email_date_missing(mock_gs):
+    """A rejection with no Date header still moves the application off 'applied'."""
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    email = SimpleNamespace(
+        uid="10",
+        message_id="<reject@example.com>",
+        date=None,
+        sender="hr@acme.com",
+        subject="We regret to inform you",
+        body="We will not be moving forward with your application.",
+        is_application=True,
+        company="Acme",
+        position="Engineer",
+        stage="rejected",
+        confidence="high",
+    )
+    infra["processor"].email_list = [email]
+    infra["processor"].application_emails = [email]
+
+    email_repo = MagicMock()
+    email_repo.exists.return_value = False
+    email_repo.create.return_value = SimpleNamespace(id=7)
+    # The worker links through match_or_create_application. An unstubbed
+    # find_by_company_and_position() is truthy, so find_or_create never runs.
+    application = SimpleNamespace(id=3)
+    app_repo = MagicMock()
+    app_repo.get_all.return_value = []
+    app_repo.find_by_company_and_position.return_value = None
+    app_repo.find_or_create.return_value = application
+    company_repo = MagicMock()
+    company_repo.session.query.return_value.all.return_value = []
+    company_repo.find_or_create.return_value = SimpleNamespace(id=9)
+    analysis_repo = MagicMock()
+    analysis_repo.create.return_value = SimpleNamespace(needs_review=False)
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository", return_value=email_repo), \
+         patch("app.worker.CompanyRepository", return_value=company_repo), \
+         patch("app.worker.ApplicationRepository", return_value=app_repo), \
+         patch("app.worker.AnalysisRepository", return_value=analysis_repo), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run()
+
+    assert result == EXIT_OK
+    application, stage, when = app_repo.update_stage.call_args[0]
+    assert stage == "rejected"
+    assert when is not None
+    assert application.id == 3

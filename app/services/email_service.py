@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from time import perf_counter
 
+from app.email_client.application_signals import reconcile_classification
 from app.email_client.client import fetch_emails_by_date_range, fetch_recent_emails
 from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification, LLMClassifier
@@ -50,6 +51,7 @@ class EmailData:
             self.sender, self.subject, self.body
         )
         latency_ms = (perf_counter() - start) * 1000
+        result = reconcile_classification(self.sender, self.subject, self.body, result)
         if result is None:
             logger.warning(
                 "LLM classify provider=%s latency_ms=%.2f outcome=no_classification",

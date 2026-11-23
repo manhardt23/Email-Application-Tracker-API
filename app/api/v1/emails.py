@@ -10,7 +10,9 @@ from app.db.models import Email, EmailAnalysis
 from app.db.repositories.analysis_repo import AnalysisRepository
 from app.db.repositories.application_repo import ApplicationRepository
 from app.db.repositories.company_repo import CompanyRepository
+from app.email_client.application_signals import infer_stage, stage_rank
 from app.llm.base import EmailClassification
+from app.llm.normalization import canonicalize_stage
 from app.middleware.rate_limit import EXPENSIVE_LIMIT, limiter
 from app.services.application_matcher import (
     UNKNOWN_COMPANY,
@@ -23,6 +25,7 @@ router = APIRouter()
 
 DbDep = Annotated[Session, Depends(get_db)]
 DEFAULT_STAGE = "applied"
+_SPECIFIC_PROMOTE_STAGES = {"rejected", "interview", "offer", "assessment", "other"}
 
 
 class EmailPromoteRequest(BaseModel):
@@ -33,6 +36,54 @@ class EmailPromoteRequest(BaseModel):
 
 class EmailLinkRequest(BaseModel):
     application_id: int
+
+
+def _requested_promote_stage(body: EmailPromoteRequest) -> str | None:
+    if "stage" not in body.model_fields_set:
+        return None
+    raw = (body.stage or "").strip()
+    if not raw:
+        return None
+    return canonicalize_stage(raw) or raw[:50]
+
+
+def _promote_stage(email: Email, analysis: EmailAnalysis | None, body: EmailPromoteRequest) -> str:
+    """Pick the stage a promoted email should record.
+
+    The emails list does not include the body, and the promote form defaults
+    to ``applied``. A real rejection, interview, assessment, or offer in the
+    subject or body replaces that default. An explicit other stage still wins.
+    """
+    requested = _requested_promote_stage(body)
+    if requested in _SPECIFIC_PROMOTE_STAGES:
+        return requested
+    text_stage = infer_stage(email.subject, email.body)
+    if text_stage in _SPECIFIC_PROMOTE_STAGES:
+        return text_stage
+    if requested:
+        return requested
+    detected = canonicalize_stage(analysis.detected_stage) if analysis else None
+    if detected:
+        return detected
+    if text_stage:
+        return text_stage
+    return DEFAULT_STAGE
+
+
+def _merge_promoted_stage(
+    *,
+    current: str | None,
+    chosen: str,
+    created: bool,
+    specific_request: bool,
+) -> str:
+    """Don't walk an existing application backwards to ``applied``."""
+    if created or specific_request:
+        return chosen
+    current_stage = canonicalize_stage(current) or (current or DEFAULT_STAGE)
+    if chosen == "rejected" or stage_rank(chosen) >= stage_rank(current_stage):
+        return chosen
+    return current_stage
 
 
 def flatten_email(email: Email) -> dict:
@@ -130,11 +181,7 @@ def promote_email_to_application(
         or ((analysis.detected_position if analysis else "") or "").strip()
         or UNKNOWN_POSITION
     )
-    stage_value = (
-        (body.stage or "").strip()
-        or ((analysis.detected_stage if analysis else "") or "").strip()
-        or DEFAULT_STAGE
-    )
+    stage_value = _promote_stage(email, analysis, body)
 
     company_repo = CompanyRepository(db)
     app_repo = ApplicationRepository(db)
@@ -148,7 +195,12 @@ def promote_email_to_application(
     )
 
     if stage_value:
-        application.stage = stage_value
+        application.stage = _merge_promoted_stage(
+            current=application.stage,
+            chosen=stage_value,
+            created=created,
+            specific_request=_requested_promote_stage(body) in _SPECIFIC_PROMOTE_STAGES,
+        )
 
     if analysis is None:
         classification = EmailClassification(
@@ -170,7 +222,10 @@ def promote_email_to_application(
             analysis.detected_company = company_name
         if not analysis.detected_position:
             analysis.detected_position = position_name
-        if not analysis.detected_stage:
+        detected_now = canonicalize_stage(analysis.detected_stage)
+        if not analysis.detected_stage or (
+            detected_now in {None, "applied", "other"} and stage_value not in {"applied", "other"}
+        ):
             analysis.detected_stage = stage_value
 
     analysis_repo.link_to_application(analysis, application.id)
