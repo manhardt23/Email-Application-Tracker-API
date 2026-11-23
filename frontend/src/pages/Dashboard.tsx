@@ -112,13 +112,14 @@ export function Dashboard() {
                   axisLine={{ stroke: "#d6d3d1" }}
                   tickLine={false}
                 />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fontSize: 11, fill: "#8a8580" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                />
+                  <YAxis
+                    allowDecimals={false}
+                    domain={[0, (dataMax: number) => (dataMax <= 0 ? 1 : dataMax)]}
+                    tick={{ fontSize: 11, fill: "#8a8580" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                  />
                 <Tooltip
                   contentStyle={{
                     borderRadius: 6,
