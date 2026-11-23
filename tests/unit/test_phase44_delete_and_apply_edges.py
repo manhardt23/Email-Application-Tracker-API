@@ -2,8 +2,6 @@
 
 from datetime import datetime
 
-import pytest
-
 from app.db.models import Application, Company, Email, EmailAnalysis, JobSuggestion
 
 
@@ -220,13 +218,6 @@ def test_apply_existing_offer_keeps_stage_and_notes(client, db):
     assert db.get(JobSuggestion, suggestion_id).dismissed is False
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Expected Acme Inc / data analyst to return the existing "
-        "Acme, Inc. / Data Analyst application with created false. "
-        "Apply returned created true and inserted another application."
-    )
-)
 def test_apply_punctuation_variant_returns_the_existing_application(client, db):
     company = _company(db, "Acme, Inc.")
     application = _application(
