@@ -326,13 +326,18 @@ def run(
                         )
                         analysis.needs_review = True
 
-                    application, _created = match_or_create_application(
+                    application, created = match_or_create_application(
                         company_repo,
                         app_repo,
                         company_name,
                         position_name,
                     )
                     analysis_repo.link_to_application(analysis, application.id)
+                    # A new row is stamped last_updated=now, so update_stage
+                    # treats a historical rejection as older and would leave
+                    # the default "applied". Record the email's stage first.
+                    if created and email_data.stage:
+                        application.stage = email_data.stage
                     # A missing Date header used to skip the stage write, so a
                     # rejection stayed "applied". Use the same timestamp stored
                     # on the email row.

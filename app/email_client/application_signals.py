@@ -314,7 +314,9 @@ def judge_email(sender: str | None, subject: str | None, body: str | None) -> Si
         # Alerts from Indeed/LinkedIn/ATS domains need explicit lifecycle wording.
         logger.debug("job board email from %s without application wording", _sender_domain(sender))
         return SignalJudgment("skip")
-    if _keyword_hits(text) >= 2:
+    # One weak keyword (resume, application, interview) is not a clear
+    # application and not an alert. Ask the model instead of skipping it.
+    if _keyword_hits(text) >= 1:
         return SignalJudgment("maybe")
     if re.search(r"\b(?:interview|assessment|phone screen)\b", text) and re.search(
         r"\b(?:schedule|invitation|invite|confirm|zoom|meet)\b", text
