@@ -40,6 +40,11 @@ from app.db.repositories.worker_run_repo import WorkerRunRepository
 from app.email_client.client import get_latest_uid, get_uid_received_date
 from app.llm.base import EmailClassification
 from app.llm.factory import build_classifier
+from app.services.application_matcher import (
+    UNKNOWN_COMPANY,
+    UNKNOWN_POSITION,
+    match_or_create_application,
+)
 from app.services.email_service import EmailProcessor
 from app.services.worker_runtime import get_effective_max_emails
 
@@ -51,8 +56,6 @@ EXIT_PIPELINE = 1
 EXIT_NO_SLOT = 2
 EXIT_CONFIG = 3
 UID_STALE_DAYS = 30
-UNKNOWN_COMPANY = "Unknown Company"
-UNKNOWN_POSITION = "Unknown Position"
 
 logger = logging.getLogger(__name__)
 
@@ -323,8 +326,12 @@ def run(
                         )
                         analysis.needs_review = True
 
-                    company = company_repo.find_or_create(company_name)
-                    application = app_repo.find_or_create(company.id, position_name)
+                    application, _created = match_or_create_application(
+                        company_repo,
+                        app_repo,
+                        company_name,
+                        position_name,
+                    )
                     analysis_repo.link_to_application(analysis, application.id)
                     # A missing Date header used to skip the stage write, so a
                     # rejection stayed "applied". Use the same timestamp stored

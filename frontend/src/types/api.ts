@@ -153,20 +153,12 @@ export type WorkerLimitResponse = {
 
 // --- Job finder ---
 
-export type QualificationFit = "met" | "partial" | "gap";
-
-export type QualificationProfile = {
-  target_titles: string;
-  skills: string;
-};
-
 export type JobSuggestion = {
   id: number;
   title: string;
   company: string;
   pay: string | null;
   requirements_summary: string;
-  qualification_fit: QualificationFit;
   apply_url: string;
 };
 

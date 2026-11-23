@@ -26,12 +26,6 @@ Suggest open job postings the user could apply to themselves.
 Search focus:
 <<QUERY>>
 
-Target titles:
-<<TITLES>>
-
-Skills:
-<<SKILLS>>
-
 Return ONLY valid JSON with no explanation:
 {
   "suggestions": [
@@ -40,7 +34,6 @@ Return ONLY valid JSON with no explanation:
       "company": "string",
       "pay": "short pay string or null if the posting does not list pay",
       "requirements_summary": "one sentence of requirements",
-      "qualification_fit": "met|partial|gap",
       "apply_url": "https link to the company application page"
     }
   ]
@@ -50,7 +43,7 @@ Rules:
 - At most 6 suggestions.
 - Every apply_url must be an http or https link on the company's own application page.
 - Use null for pay when the posting does not list it.
-- qualification_fit compares the posting to the target titles and skills above.
+- Do not score the posting against a profile, target titles, or skills.
 - Skip roles you cannot ground with a real apply URL.
 """
 
@@ -74,12 +67,8 @@ def _clip(value: str, limit: int) -> str:
     return text[:limit]
 
 
-def build_prompt(*, query: str, target_titles: str, skills: str) -> str:
-    return (
-        _PROMPT.replace("<<QUERY>>", _clip(query, 500))
-        .replace("<<TITLES>>", _clip(target_titles, 1500))
-        .replace("<<SKILLS>>", _clip(skills, 1500))
-    )
+def build_prompt(*, query: str) -> str:
+    return _PROMPT.replace("<<QUERY>>", _clip(query, 500))
 
 
 def _message_text(message: dict[str, Any]) -> str:
@@ -179,12 +168,10 @@ def fetch_job_suggestions(
     model: str,
     base_url: str,
     query: str,
-    target_titles: str,
-    skills: str,
 ) -> list[SuggestedJob]:
     """Call xAI chat completions and return parsed suggestions."""
     url = base_url.rstrip("/") + "/chat/completions"
-    prompt = build_prompt(query=query, target_titles=target_titles, skills=skills)
+    prompt = build_prompt(query=query)
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post(

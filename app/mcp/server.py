@@ -14,9 +14,11 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.mcp import tools as tool_impls
 from app.mcp.auth import credential_is_valid
+from app.middleware.rate_limit import limiter
 
 _INSTRUCTIONS = (
-    "Read applications and manage job suggestions plus the job-finder profile. "
+    "Read applications and manage job suggestions. "
+    "There is no job-finder profile and no fit score. "
     "Job-site logins are not available. "
     "This server cannot send or check email, run a backfill, manage users, "
     "delete records, or change secrets."
@@ -28,6 +30,10 @@ class McpBearerMiddleware:
 
     def __init__(self, app: ASGIApp):
         self.app = app
+        # slowapi names the matched endpoint as module.__name__. An ASGI instance
+        # has no __name__, so a /mcp call raised AttributeError and returned 500
+        # before this bearer check could answer 401.
+        self.__name__ = "mcp_endpoint"
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -78,7 +84,10 @@ def build_mcp() -> FastMCP:
 
     @mcp.tool()
     def list_job_suggestions() -> dict:
-        """List stored job suggestions, hiding roles that match an application."""
+        """List stored job suggestions.
+
+        Hides roles that match an application and suggestions that were dismissed.
+        """
         return tool_impls.list_job_suggestions()
 
     @mcp.tool()
@@ -124,19 +133,6 @@ def build_mcp() -> FastMCP:
             apply_url=apply_url,
         )
 
-    @mcp.tool()
-    def get_job_finder_profile() -> dict:
-        """Read the job-finder profile: target titles and skills."""
-        return tool_impls.get_job_finder_profile()
-
-    @mcp.tool()
-    def update_job_finder_profile(
-        target_titles: Annotated[str, Field(description="Target job titles.")] = "",
-        skills: Annotated[str, Field(description="Skills to compare postings against.")] = "",
-    ) -> dict:
-        """Replace the job-finder profile. Both fields are saved as given."""
-        return tool_impls.update_job_finder_profile(target_titles=target_titles, skills=skills)
-
     return mcp
 
 
@@ -147,4 +143,8 @@ def protected_mcp_app(mcp: FastMCP) -> ASGIApp:
     The caller runs ``mcp.session_manager.run()`` in the FastAPI lifespan.
     """
     mcp.streamable_http_app()
-    return McpBearerMiddleware(StreamableHTTPASGIApp(mcp.session_manager))
+    endpoint = McpBearerMiddleware(StreamableHTTPASGIApp(mcp.session_manager))
+    # Register the name only. exempt() also returns a sync wrapper, which
+    # Starlette would treat as a request function instead of this ASGI app.
+    limiter.exempt(endpoint)
+    return endpoint

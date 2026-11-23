@@ -1085,3 +1085,31 @@ Not exposed: email send/check, backfill, user admin, deletes, secret changes, or
 2. Mount the MCP server on the FastAPI app with the bearer check
 3. Tests: missing credential, wrong credential (including a login JWT), valid credential lists applications
 4. README: MCP URL and `Authorization: Bearer <credential>`
+
+## Phase 37 Breakdown (manageable chunks)
+
+**Phase:** 37 — API boot crash after the MCP deploy  
+**Branch:** `phase37-api-boot-crash` (from `main`)  
+**Already done:** Job finder and `/mcp` are on `main`. CI deployed that image. `MCP_BEARER_TOKEN` is optional and startup only logs when it is unset.  
+**This phase delivers:** The API keeps serving when `MCP_BEARER_TOKEN` is unset. `/mcp` returns 401. The rate limiter must not turn that route into a 500. Deploy reloads nginx after the API container is recreated so the origin does not keep the previous API address.
+
+## Phase 38 Breakdown (manageable chunks)
+
+**Phase:** 38 — origin still 502 after the green main deploy  
+**Branch:** `cursor/phase38-fix-origin-502-dc83` (from `main`)  
+**Already done:** Phase 37 is on `main` and the deploy job succeeded. Nginx reload ran. The site still returns Cloudflare 502.  
+**This phase delivers:** One live nginx file (`tracker.conf`) that re-resolves the API container, a healthcheck so compose waits until `/api/v1/health` answers, and a deploy that overwrites host copies, deletes the extra conf, and prints API logs when that healthcheck fails.
+
+## Phase 39 Breakdown (manageable chunks)
+
+**Phase:** 39 — API exits because psycopg is not installed  
+**Branch:** `cursor/phase39-psycopg-driver-dc83` (from `main`)  
+**Already done:** The main deploy of the nginx fix printed the container traceback. SQLAlchemy 2.1 imports `psycopg` from `create_engine` and the image only had `psycopg2`.  
+**This phase delivers:** `psycopg[binary]` in the image dependencies, and a test that a `postgresql://` engine imports that driver.
+
+## Phase 40 Breakdown (manageable chunks)
+
+**Phase:** 40 — drop the editable job-finder profile
+**Branch:** `phase40-drop-finder-profile` (from `main`)
+**Already done:** The job finder stores suggestions and a qualification profile, and cards show met, partial, or gap against that profile.
+**This phase delivers:** No profile UI, API, or MCP tools, and no fit badge. Suggestions can be dismissed so they leave the list without becoming an application. Title, pay (or “No pay listed”), and the Apply link stay.

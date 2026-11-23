@@ -3,51 +3,38 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+import re
 
 from sqlalchemy.orm import Session
 
-from app.db.models import Application, Company, JobSuggestion, QualificationProfile
+from app.db.models import Application, Company, JobSuggestion
+from app.db.repositories.application_repo import ApplicationRepository
+from app.db.repositories.company_repo import CompanyRepository
 from app.llm.errors import FinderError
 from app.llm.xai_finder import _clean_pay, _valid_apply_url, fetch_job_suggestions
-from app.services.qualification_fit import role_key, summarize_fit
 
 logger = logging.getLogger(__name__)
 
 
 class SuggestionError(Exception):
-    """A create or update that the caller can correct. The message is safe to return."""
+    """A create, update, or dismiss that the caller can correct. The message is safe to return."""
 
 
-EMPTY_SEARCH_DETAIL = "Add target titles to your profile, or enter a search."
+EMPTY_SEARCH_DETAIL = "Enter a search."
 MISSING_XAI_KEY_DETAIL = (
     "XAI_API_KEY is not set. Add it to the environment before searching for jobs."
 )
 
 
-def _profile(session: Session) -> QualificationProfile | None:
-    return session.query(QualificationProfile).order_by(QualificationProfile.id).first()
+def normalize_label(value: str | None) -> str:
+    """Case-fold and collapse punctuation and whitespace to single spaces."""
+    if not value:
+        return ""
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
 
 
-def profile_payload(session: Session) -> dict[str, str]:
-    row = _profile(session)
-    if row is None:
-        return {"target_titles": "", "skills": ""}
-    return {"target_titles": row.target_titles, "skills": row.skills}
-
-
-def save_profile(session: Session, *, target_titles: str, skills: str) -> dict[str, str]:
-    row = _profile(session)
-    if row is None:
-        row = QualificationProfile(target_titles=target_titles, skills=skills)
-        session.add(row)
-    else:
-        row.target_titles = target_titles
-        row.skills = skills
-        row.updated_at = datetime.now(UTC)
-    session.commit()
-    session.refresh(row)
-    return {"target_titles": row.target_titles, "skills": row.skills}
+def role_key(company: str | None, title: str | None) -> tuple[str, str]:
+    return normalize_label(company), normalize_label(title)
 
 
 def _application_keys(session: Session) -> set[tuple[str, str]]:
@@ -69,19 +56,13 @@ def _suggestion_keys(rows: list[JobSuggestion]) -> set[tuple[str, str]]:
     return keys
 
 
-def _serialize(row: JobSuggestion, profile: dict[str, str]) -> dict:
+def _serialize(row: JobSuggestion) -> dict:
     return {
         "id": row.id,
         "title": row.title,
         "company": row.company_name,
         "pay": row.pay,
         "requirements_summary": row.requirements_summary,
-        "qualification_fit": summarize_fit(
-            target_titles=profile["target_titles"],
-            skills=profile["skills"],
-            title=row.title,
-            requirements=row.requirements_summary,
-        ),
         "apply_url": row.apply_url,
     }
 
@@ -89,21 +70,35 @@ def _serialize(row: JobSuggestion, profile: dict[str, str]) -> dict:
 def _stored_suggestions(session: Session) -> list[JobSuggestion]:
     return (
         session.query(JobSuggestion)
+        .filter(JobSuggestion.dismissed.is_(False))
         .order_by(JobSuggestion.created_at.desc(), JobSuggestion.id.desc())
         .limit(100)
         .all()
     )
 
 
+def _dismissed_keys(session: Session) -> set[tuple[str, str]]:
+    rows = (
+        session.query(JobSuggestion.company_name, JobSuggestion.title)
+        .filter(JobSuggestion.dismissed.is_(True))
+        .all()
+    )
+    keys = set()
+    for name, title in rows:
+        key = role_key(name, title)
+        if key != ("", ""):
+            keys.add(key)
+    return keys
+
+
 def list_suggestions(session: Session) -> list[dict]:
     """Suggestions whose company and normalized title are not already applications."""
-    profile = profile_payload(session)
     applied = _application_keys(session)
     visible = []
     for row in _stored_suggestions(session):
         if role_key(row.company_name, row.title) in applied:
             continue
-        visible.append(_serialize(row, profile))
+        visible.append(_serialize(row))
     return visible
 
 
@@ -119,8 +114,7 @@ def search_jobs(
     if not key:
         raise FinderError(MISSING_XAI_KEY_DETAIL, status_code=503)
 
-    profile = profile_payload(session)
-    focus = (query or "").strip() or profile["target_titles"].strip()
+    focus = (query or "").strip()
     if not focus:
         raise FinderError(EMPTY_SEARCH_DETAIL, status_code=422)
 
@@ -129,13 +123,11 @@ def search_jobs(
         model=model,
         base_url=base_url,
         query=focus,
-        target_titles=profile["target_titles"],
-        skills=profile["skills"],
     )
 
     applied = _application_keys(session)
     stored = _stored_suggestions(session)
-    seen = set(applied) | _suggestion_keys(stored)
+    seen = set(applied) | _suggestion_keys(stored) | _dismissed_keys(session)
     added_rows: list[JobSuggestion] = []
     skipped_existing = 0
 
@@ -162,9 +154,8 @@ def search_jobs(
         session.refresh(row)
 
     logger.info("finder search added=%s skipped_existing=%s", len(added_rows), skipped_existing)
-    profile = profile_payload(session)
     return {
-        "added": [_serialize(row, profile) for row in added_rows],
+        "added": [_serialize(row) for row in added_rows],
         "skipped_existing": skipped_existing,
     }
 
@@ -231,7 +222,7 @@ def create_suggestion(
     session.add(row)
     session.commit()
     session.refresh(row)
-    return _serialize(row, profile_payload(session))
+    return _serialize(row)
 
 
 def update_suggestion(session: Session, suggestion_id: int, changes: dict) -> dict:
@@ -268,4 +259,53 @@ def update_suggestion(session: Session, suggestion_id: int, changes: dict) -> di
 
     session.commit()
     session.refresh(row)
-    return _serialize(row, profile_payload(session))
+    return _serialize(row)
+
+
+def dismiss_suggestion(session: Session, suggestion_id: int) -> dict:
+    """Hide one suggestion. The row stays stored and no application is created."""
+    row = session.query(JobSuggestion).filter(JobSuggestion.id == suggestion_id).first()
+    if row is None:
+        raise SuggestionError("Suggestion not found")
+    row.dismissed = True
+    session.commit()
+    session.refresh(row)
+    return {"id": row.id, "dismissed": True}
+
+
+def _posting_notes(apply_url: str, pay: str | None) -> str:
+    """Apply URL on its own line, plus the pay line only when pay is present."""
+    lines = [apply_url.strip()]
+    pay_line = (pay or "").strip()
+    if pay_line:
+        lines.append(pay_line)
+    return "\n".join(lines)
+
+
+def apply_suggestion(session: Session, suggestion_id: int) -> dict:
+    """Record the suggestion as an application. Does not dismiss the suggestion.
+
+    A later list hides the card because the company and title match an
+    application. An existing application is returned unchanged.
+    """
+    row = session.query(JobSuggestion).filter(JobSuggestion.id == suggestion_id).first()
+    if row is None:
+        raise SuggestionError("Suggestion not found")
+
+    company = CompanyRepository(session).find_or_create(row.company_name)
+    applications = ApplicationRepository(session)
+    existing = applications.find_by_company_and_position(company.id, row.title)
+    application = applications.find_or_create(company.id, row.title)
+    created = existing is None
+    if created:
+        application.notes = _posting_notes(row.apply_url, row.pay)
+
+    session.commit()
+    session.refresh(application)
+    return {
+        "application_id": application.id,
+        "company": company.name,
+        "position": application.position,
+        "stage": application.stage,
+        "created": created,
+    }

@@ -441,6 +441,9 @@ def test_worker_processes_new_email_successfully(monkeypatch):
         def __init__(self, session):  # noqa: ANN001
             self.session = session
 
+        def find_by_company_and_position(self, company_id, position):  # noqa: ANN001
+            return None
+
         def find_or_create(self, company_id, position):  # noqa: ANN001
             created_application_positions.append(position)
             return SimpleNamespace(id=202)
