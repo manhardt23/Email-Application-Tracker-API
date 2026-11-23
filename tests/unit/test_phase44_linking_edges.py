@@ -8,7 +8,6 @@ title differs, and unknown company or title never uses that company-only rule.
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -485,12 +484,6 @@ def test_promote_newer_applied_email_does_not_walk_interview_back(client, db):
     assert stored.position == "Engineer"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Expected an older rejection to leave an interview at stage interview. "
-        "Promote stored stage rejected."
-    )
-)
 def test_promote_older_rejection_does_not_change_interview(client, db):
     company = _seed_company(db, "Acme")
     application = _seed_application(
@@ -711,12 +704,6 @@ def test_worker_blank_company_and_title_do_not_attach_to_a_real_application(monk
         check.close()
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Expected a newer email staged applied to leave an existing interview at interview. "
-        "The worker stored stage applied."
-    )
-)
 def test_worker_does_not_walk_interview_back_to_applied(monkeypatch):
     Session = _memory_session()
     worker_module = _bind_worker(monkeypatch, Session)
@@ -829,12 +816,6 @@ def test_worker_newer_rejection_is_stored_as_rejected(monkeypatch):
         check.close()
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Expected a new rejection email to be stored as rejected. "
-        "The worker left the new application at applied."
-    )
-)
 def test_worker_new_rejection_is_not_stored_as_applied(monkeypatch):
     Session = _memory_session()
     worker_module = _bind_worker(monkeypatch, Session)

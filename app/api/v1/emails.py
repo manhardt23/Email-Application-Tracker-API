@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -70,17 +71,38 @@ def _promote_stage(email: Email, analysis: EmailAnalysis | None, body: EmailProm
     return DEFAULT_STAGE
 
 
+def _as_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def _received_is_newer(received: datetime | None, last_updated: datetime | None) -> bool:
+    """True when this email is strictly after the application's last update.
+
+    A missing timestamp does not block the update. An older email does,
+    including an older rejection.
+    """
+    if received is None or last_updated is None:
+        return True
+    return _as_utc_naive(received) > _as_utc_naive(last_updated)
+
+
 def _merge_promoted_stage(
     *,
     current: str | None,
     chosen: str,
     created: bool,
     specific_request: bool,
+    email_received: datetime | None = None,
+    last_updated: datetime | None = None,
 ) -> str:
-    """Don't walk an existing application backwards to ``applied``."""
+    """Don't walk an existing application backwards, or overwrite it from an older email."""
     if created or specific_request:
         return chosen
     current_stage = canonicalize_stage(current) or (current or DEFAULT_STAGE)
+    if not _received_is_newer(email_received, last_updated):
+        return current_stage
     if chosen == "rejected" or stage_rank(chosen) >= stage_rank(current_stage):
         return chosen
     return current_stage
@@ -200,6 +222,8 @@ def promote_email_to_application(
             chosen=stage_value,
             created=created,
             specific_request=_requested_promote_stage(body) in _SPECIFIC_PROMOTE_STAGES,
+            email_received=email.received_date,
+            last_updated=application.last_updated,
         )
 
     if analysis is None:
