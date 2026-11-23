@@ -33,3 +33,24 @@ export function useDismissSuggestion() {
     },
   });
 }
+
+export function useApplySuggestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) =>
+      (
+        await api.post<{
+          application_id: number;
+          company: string;
+          position: string;
+          stage: string;
+          created: boolean;
+        }>(`/finder/suggestions/${id}/apply`)
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.finder.suggestions });
+      qc.invalidateQueries({ queryKey: queryKeys.applications.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}
