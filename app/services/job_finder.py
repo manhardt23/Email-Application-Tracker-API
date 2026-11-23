@@ -8,6 +8,8 @@ import re
 from sqlalchemy.orm import Session
 
 from app.db.models import Application, Company, JobSuggestion
+from app.db.repositories.application_repo import ApplicationRepository
+from app.db.repositories.company_repo import CompanyRepository
 from app.llm.errors import FinderError
 from app.llm.xai_finder import _clean_pay, _valid_apply_url, fetch_job_suggestions
 
@@ -269,3 +271,41 @@ def dismiss_suggestion(session: Session, suggestion_id: int) -> dict:
     session.commit()
     session.refresh(row)
     return {"id": row.id, "dismissed": True}
+
+
+def _posting_notes(apply_url: str, pay: str | None) -> str:
+    """Apply URL on its own line, plus the pay line only when pay is present."""
+    lines = [apply_url.strip()]
+    pay_line = (pay or "").strip()
+    if pay_line:
+        lines.append(pay_line)
+    return "\n".join(lines)
+
+
+def apply_suggestion(session: Session, suggestion_id: int) -> dict:
+    """Record the suggestion as an application. Does not dismiss the suggestion.
+
+    A later list hides the card because the company and title match an
+    application. An existing application is returned unchanged.
+    """
+    row = session.query(JobSuggestion).filter(JobSuggestion.id == suggestion_id).first()
+    if row is None:
+        raise SuggestionError("Suggestion not found")
+
+    company = CompanyRepository(session).find_or_create(row.company_name)
+    applications = ApplicationRepository(session)
+    existing = applications.find_by_company_and_position(company.id, row.title)
+    application = applications.find_or_create(company.id, row.title)
+    created = existing is None
+    if created:
+        application.notes = _posting_notes(row.apply_url, row.pay)
+
+    session.commit()
+    session.refresh(application)
+    return {
+        "application_id": application.id,
+        "company": company.name,
+        "position": application.position,
+        "stage": application.stage,
+        "created": created,
+    }
