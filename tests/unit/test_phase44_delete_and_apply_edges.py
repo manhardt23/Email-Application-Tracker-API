@@ -218,6 +218,42 @@ def test_apply_existing_offer_keeps_stage_and_notes(client, db):
     assert db.get(JobSuggestion, suggestion_id).dismissed is False
 
 
+def test_apply_different_title_at_the_same_company_creates_another_application(client, db):
+    company = _company(db, "Acme")
+    existing = _application(db, company, "Engineer", stage="interview", notes="Keep me")
+    suggestion = JobSuggestion(
+        title="Data Analyst",
+        company_name="Acme",
+        pay="$90k",
+        requirements_summary="SQL",
+        apply_url="https://acme.example/analyst",
+        dismissed=False,
+    )
+    db.add(suggestion)
+    db.commit()
+    existing_id = existing.id
+    suggestion_id = suggestion.id
+
+    applied = client.post(f"/api/v1/finder/suggestions/{suggestion_id}/apply")
+
+    assert applied.status_code == 200
+    body = applied.json()
+    assert body["created"] is True
+    assert body["company"] == "Acme"
+    assert body["position"] == "Data Analyst"
+    assert body["stage"] == "applied"
+    assert body["application_id"] != existing_id
+    db.expire_all()
+    assert db.query(Application).count() == 2
+    kept = db.get(Application, existing_id)
+    assert kept.position == "Engineer"
+    assert kept.stage == "interview"
+    assert kept.notes == "Keep me"
+    created = db.get(Application, body["application_id"])
+    assert created.position == "Data Analyst"
+    assert "https://acme.example/analyst" in (created.notes or "")
+
+
 def test_apply_punctuation_variant_returns_the_existing_application(client, db):
     company = _company(db, "Acme, Inc.")
     application = _application(

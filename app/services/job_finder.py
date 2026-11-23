@@ -296,11 +296,15 @@ def apply_suggestion(session: Session, suggestion_id: int) -> dict:
     # case variants are the existing application, not a second row.
     from app.services.application_matcher import match_or_create_application
 
+    # Email linking may attach a fuzzy title to the only role at a company.
+    # A suggestion names the role the user asked to track, so a different
+    # title at that company is a new application.
     application, created = match_or_create_application(
         CompanyRepository(session),
         ApplicationRepository(session),
         row.company_name,
         row.title,
+        company_only=False,
     )
     if created:
         application.notes = _posting_notes(row.apply_url, row.pay)
