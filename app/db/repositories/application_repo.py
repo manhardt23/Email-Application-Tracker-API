@@ -2,8 +2,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm.attributes import set_committed_value
 
-from app.db.models import Application, Company
+from app.db.models import Application, Company, EmailAnalysis
 from app.db.repositories.base import BaseRepository
 
 
@@ -79,6 +80,22 @@ class ApplicationRepository(BaseRepository):
             self.session.add(application)
             self.session.flush()
         return application
+
+    def delete(self, application: Application) -> None:
+        """Clear ``application_id`` on linked analyses, then delete the application.
+
+        Emails and their analyses stay in the inbox. The analyses relationship
+        cascades deletes, so the collection is detached after the unlink.
+        """
+        (
+            self.session.query(EmailAnalysis)
+            .filter(EmailAnalysis.application_id == application.id)
+            .update({EmailAnalysis.application_id: None}, synchronize_session="fetch")
+        )
+        self.session.flush()
+        set_committed_value(application, "analyses", [])
+        self.session.delete(application)
+        self.session.flush()
 
     def update_stage(
         self, application: Application, new_stage: str | None, date: datetime | None

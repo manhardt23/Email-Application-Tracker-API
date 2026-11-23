@@ -13,7 +13,12 @@ import { Select } from "../components/ui/Select";
 import { Skeleton } from "../components/ui/Skeleton";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { useToast } from "../components/ui/Toast";
-import { useApplication, useApplicationEmails, useUpdateApplication } from "../hooks/useApplications";
+import {
+  useApplication,
+  useApplicationEmails,
+  useDeleteApplication,
+  useUpdateApplication,
+} from "../hooks/useApplications";
 import { useUnlinkEmail } from "../hooks/useEmails";
 import { errorMessage, formatDate, formatDateTime } from "../lib/format";
 import { classifyEmail, STAGE_OPTIONS, statusSwatch } from "../lib/semantic";
@@ -27,6 +32,7 @@ export function ApplicationDetail() {
   const query = useApplication(appId);
   const emails = useApplicationEmails(appId);
   const update = useUpdateApplication(appId);
+  const remove = useDeleteApplication(appId);
   const unlink = useUnlinkEmail();
 
   const [form, setForm] = useState({ stage: "", company_name: "", position: "", notes: "" });
@@ -104,6 +110,22 @@ export function ApplicationDetail() {
 
   const app = query.data;
 
+  function handleDelete() {
+    const label = `${app.company?.name ?? "Unknown"} — ${app.position}`;
+    const confirmed = window.confirm(
+      `Delete ${label}? Linked emails stay in the inbox and can be linked again.`,
+    );
+    if (!confirmed) return;
+    remove.mutate(undefined, {
+      onSuccess: () => {
+        toast({ tone: "success", message: "Application deleted." });
+        navigate("/applications");
+      },
+      onError: (e) =>
+        toast({ tone: "error", message: errorMessage(e, "Could not delete application.") }),
+    });
+  }
+
   return (
     <>
       <PageHeader
@@ -113,6 +135,9 @@ export function ApplicationDetail() {
           <>
             <Button variant="secondary" onClick={() => navigate("/applications")}>
               <ArrowLeft className="size-3.5" /> Back
+            </Button>
+            <Button variant="danger" loading={remove.isPending} onClick={handleDelete}>
+              Delete
             </Button>
             <Button variant="primary" loading={update.isPending} onClick={handleSave}>
               Save changes

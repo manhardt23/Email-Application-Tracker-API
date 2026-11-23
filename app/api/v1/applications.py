@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 from starlette.requests import Request
@@ -116,3 +116,15 @@ def update_application(application_id: int, body: ApplicationUpdate, db: DbDep, 
     db.commit()
     db.refresh(application)
     return application
+
+
+@router.delete("/{application_id}", status_code=204)
+def delete_application(application_id: int, db: DbDep, _user: AdminUser):
+    """Unlink this application's emails, then delete it. Emails stay in the inbox."""
+    repo = ApplicationRepository(db)
+    application = repo.get_by_id(application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    repo.delete(application)
+    db.commit()
+    return Response(status_code=204)
