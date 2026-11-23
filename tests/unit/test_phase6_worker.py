@@ -389,8 +389,16 @@ def test_run_applies_stage_when_email_date_missing(mock_gs):
     email_repo = MagicMock()
     email_repo.exists.return_value = False
     email_repo.create.return_value = SimpleNamespace(id=7)
+    # The worker links through match_or_create_application. An unstubbed
+    # find_by_company_and_position() is truthy, so find_or_create never runs.
+    application = SimpleNamespace(id=3)
     app_repo = MagicMock()
-    app_repo.find_or_create.return_value = SimpleNamespace(id=3)
+    app_repo.get_all.return_value = []
+    app_repo.find_by_company_and_position.return_value = None
+    app_repo.find_or_create.return_value = application
+    company_repo = MagicMock()
+    company_repo.session.query.return_value.all.return_value = []
+    company_repo.find_or_create.return_value = SimpleNamespace(id=9)
     analysis_repo = MagicMock()
     analysis_repo.create.return_value = SimpleNamespace(needs_review=False)
 
@@ -398,7 +406,7 @@ def test_run_applies_stage_when_email_date_missing(mock_gs):
          patch("app.worker.SessionLocal", return_value=infra["session"]), \
          patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
          patch("app.worker.EmailRepository", return_value=email_repo), \
-         patch("app.worker.CompanyRepository"), \
+         patch("app.worker.CompanyRepository", return_value=company_repo), \
          patch("app.worker.ApplicationRepository", return_value=app_repo), \
          patch("app.worker.AnalysisRepository", return_value=analysis_repo), \
          patch("app.worker.build_classifier"), \
