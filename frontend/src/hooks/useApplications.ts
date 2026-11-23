@@ -65,8 +65,13 @@ export function useDeleteApplication(id: number) {
       await api.delete(`/applications/${id}`);
     },
     onSuccess: () => {
-      qc.removeQueries({ queryKey: queryKeys.applications.detail(id) });
-      qc.invalidateQueries({ queryKey: queryKeys.applications.all });
+      // Drop in-flight detail reads so deleting does not refetch a row that is gone.
+      qc.cancelQueries({ queryKey: queryKeys.applications.detail(id) });
+      qc.cancelQueries({ queryKey: queryKeys.applications.emails(id) });
+      qc.invalidateQueries({
+        queryKey: queryKeys.applications.all,
+        refetchType: "none",
+      });
     },
   });
 }

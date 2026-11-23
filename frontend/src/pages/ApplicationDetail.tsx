@@ -119,7 +119,7 @@ export function ApplicationDetail() {
     remove.mutate(undefined, {
       onSuccess: () => {
         toast({ tone: "success", message: "Application deleted." });
-        navigate("/applications");
+        navigate("/applications", { replace: true });
       },
       onError: (e) =>
         toast({ tone: "error", message: errorMessage(e, "Could not delete application.") }),
