@@ -120,6 +120,28 @@ def _resolve_uid_cursor(last_processed_uid: int, imap_timeout_seconds: int) -> i
     return last_processed_uid
 
 
+def _received_at(email_data, *, missing: datetime) -> datetime:
+    """UTC time of one fetched email. A missing Date header sorts as ``missing``."""
+    received = email_data.date or missing
+    if received.tzinfo is None or received.tzinfo.utcoffset(received) is None:
+        return received.replace(tzinfo=UTC)
+    return received.astimezone(UTC)
+
+
+def _sort_chronologically(emails: list) -> list:
+    """Oldest first, so stage updates see mailbox order.
+
+    Incremental IMAP fetch is newest-first. ``update_stage`` ignores an email
+    that is not strictly newer than ``last_updated`` and still saves it, so
+    the next run treats it as a duplicate. In one check that contains both a
+    February interview and a March "application viewed" (stage applied), the
+    March message is processed first, moves the clock to March, and the
+    interview never advances the stage.
+    """
+    missing = datetime.now(UTC)
+    return sorted(emails, key=lambda email_data: _received_at(email_data, missing=missing))
+
+
 def _validate_config(settings) -> str | None:
     """Return an error message if config is fatally invalid, else None."""
     valid_providers = ("groq", "ollama")
@@ -247,6 +269,9 @@ def run(
             to_date=backfill_to,
         )
         processor.analyze_emails()
+        # Newest-first fetch would let a later applied email hide an earlier
+        # interview or offer in this same batch. See _sort_chronologically.
+        processor.email_list = _sort_chronologically(processor.email_list)
 
         email_repo = EmailRepository(session)
         company_repo = CompanyRepository(session)

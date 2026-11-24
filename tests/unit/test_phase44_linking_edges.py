@@ -968,6 +968,126 @@ def test_worker_later_email_in_the_same_run_advances_a_new_application(monkeypat
         check.close()
 
 
+def test_worker_newest_first_batch_keeps_an_earlier_interview(monkeypatch):
+    """Incremental fetch is newest-first. An earlier interview must still land.
+
+    Trigger: one check contains a March "application viewed" (applied) and a
+    February interview for the same role. Processing March first used to set
+    last_updated to March and then drop the interview. The interview email
+    was saved, so the next run skipped it as a duplicate and the stage stayed
+    applied.
+    """
+    Session = _memory_session()
+    worker_module = _bind_worker(monkeypatch, Session)
+    viewed = _application_email(
+        message_id="<p44-order-viewed@test>",
+        uid="4440",
+        company="Acme",
+        position="Engineer",
+        stage="applied",
+        when=datetime(2026, 3, 1, tzinfo=UTC),
+        body="Your application was viewed.",
+    )
+    interview = _application_email(
+        message_id="<p44-order-interview@test>",
+        uid="4439",
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        when=datetime(2026, 2, 1, tzinfo=UTC),
+        body="We would like to schedule an interview.",
+    )
+
+    assert _run_worker(monkeypatch, worker_module, [viewed, interview]) == 0
+
+    check = Session()
+    try:
+        stored = check.query(Application).one()
+        assert stored.stage == "interview"
+        assert check.query(Email).count() == 2
+    finally:
+        check.close()
+
+
+def test_worker_newest_first_batch_advances_an_existing_application(monkeypatch):
+    """A later applied status in the same check must not freeze an interview."""
+    Session = _memory_session()
+    worker_module = _bind_worker(monkeypatch, Session)
+    session = Session()
+    company = _seed_company(session, "Acme")
+    application = _seed_application(
+        session,
+        company,
+        "Engineer",
+        stage="applied",
+        last_updated=datetime(2026, 1, 15),
+    )
+    session.commit()
+    application_id = application.id
+    session.close()
+
+    viewed = _application_email(
+        message_id="<p44-order-existing-viewed@test>",
+        uid="4442",
+        company="Acme",
+        position="Engineer",
+        stage="applied",
+        when=datetime(2026, 3, 1, tzinfo=UTC),
+        body="Your application status is under review.",
+    )
+    interview = _application_email(
+        message_id="<p44-order-existing-interview@test>",
+        uid="4441",
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        when=datetime(2026, 2, 1, tzinfo=UTC),
+        body="Your interview is confirmed.",
+    )
+
+    assert _run_worker(monkeypatch, worker_module, [viewed, interview]) == 0
+
+    check = Session()
+    try:
+        stored = check.get(Application, application_id)
+        assert stored.stage == "interview"
+        assert check.query(Application).count() == 1
+    finally:
+        check.close()
+
+
+def test_worker_newest_first_batch_still_lets_a_later_rejection_win(monkeypatch):
+    Session = _memory_session()
+    worker_module = _bind_worker(monkeypatch, Session)
+    rejection = _application_email(
+        message_id="<p44-order-reject@test>",
+        uid="4444",
+        company="Acme",
+        position="Engineer",
+        stage="rejected",
+        when=datetime(2026, 3, 1, tzinfo=UTC),
+        body="We will not be moving forward with your application.",
+    )
+    interview = _application_email(
+        message_id="<p44-order-reject-interview@test>",
+        uid="4443",
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        when=datetime(2026, 2, 1, tzinfo=UTC),
+        body="We would like to schedule an interview.",
+    )
+
+    assert _run_worker(monkeypatch, worker_module, [rejection, interview]) == 0
+
+    check = Session()
+    try:
+        stored = check.query(Application).one()
+        assert stored.stage == "rejected"
+    finally:
+        check.close()
+
+
 def test_worker_later_applied_email_does_not_walk_a_new_interview_back(monkeypatch):
     Session = _memory_session()
     worker_module = _bind_worker(monkeypatch, Session)
