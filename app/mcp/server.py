@@ -18,7 +18,9 @@ from app.middleware.rate_limit import limiter
 
 _INSTRUCTIONS = (
     "Read applications and manage job suggestions. "
-    "There is no job-finder profile and no fit score. "
+    "There is no job-finder profile. "
+    "Set importance_score from 0 to 100 for how important it is that Jacob apply. "
+    "The app does not calculate the score. "
     "Job-site logins are not available. "
     "This server cannot send or check email, run a backfill, manage users, "
     "delete records, or change secrets."
@@ -87,6 +89,8 @@ def build_mcp() -> FastMCP:
         """List stored job suggestions.
 
         Hides roles that match an application and suggestions that were dismissed.
+        Each item includes importance_score from 0 to 100, or null when it has
+        not been scored. Highest scores come first. Unscored rows stay last.
         """
         return tool_impls.list_job_suggestions()
 
@@ -97,6 +101,17 @@ def build_mcp() -> FastMCP:
         apply_url: Annotated[str, Field(description="http or https application link.")],
         pay: Annotated[str | None, Field(description="Pay text, or omit when unknown.")] = None,
         requirements_summary: Annotated[str, Field(description="Short requirements text.")] = "",
+        importance_score: Annotated[
+            int | None,
+            Field(
+                ge=0,
+                le=100,
+                description=(
+                    "How important it is that Jacob apply, from 0 to 100. "
+                    "Omit to leave the score empty. The app does not calculate it."
+                ),
+            ),
+        ] = None,
     ) -> dict:
         """Create one job suggestion. Does not search the web and stores no site login."""
         return tool_impls.create_job_suggestion(
@@ -105,6 +120,7 @@ def build_mcp() -> FastMCP:
             apply_url=apply_url,
             pay=pay,
             requirements_summary=requirements_summary,
+            importance_score=importance_score,
         )
 
     @mcp.tool()
@@ -122,6 +138,18 @@ def build_mcp() -> FastMCP:
         apply_url: Annotated[
             str | None, Field(description="New http or https link. Omit to leave it.")
         ] = None,
+        importance_score: Annotated[
+            int | None,
+            Field(
+                ge=0,
+                le=100,
+                description=(
+                    "How important it is that Jacob apply, from 0 to 100. "
+                    "Omit to leave the stored score unchanged. "
+                    "The app does not calculate it."
+                ),
+            ),
+        ] = None,
     ) -> dict:
         """Update one job suggestion. Does not delete it."""
         return tool_impls.update_job_suggestion(
@@ -131,6 +159,7 @@ def build_mcp() -> FastMCP:
             pay=pay,
             requirements_summary=requirements_summary,
             apply_url=apply_url,
+            importance_score=importance_score,
         )
 
     return mcp

@@ -64,6 +64,7 @@ def _serialize(row: JobSuggestion) -> dict:
         "pay": row.pay,
         "requirements_summary": row.requirements_summary,
         "apply_url": row.apply_url,
+        "importance_score": row.importance_score,
     }
 
 
@@ -91,14 +92,27 @@ def _dismissed_keys(session: Session) -> set[tuple[str, str]]:
     return keys
 
 
+def _by_importance(item: dict) -> tuple[bool, int]:
+    """Highest score first. Unscored rows stay last, in their existing order."""
+    score = item["importance_score"]
+    if score is None:
+        return (True, 0)
+    return (False, -score)
+
+
 def list_suggestions(session: Session) -> list[dict]:
-    """Suggestions whose company and normalized title are not already applications."""
+    """Suggestions whose company and normalized title are not already applications.
+
+    Scored rows come first, highest importance_score first. Unscored rows stay
+    at the bottom in the stored order (newest first). 0 is a real low score.
+    """
     applied = _application_keys(session)
     visible = []
     for row in _stored_suggestions(session):
         if role_key(row.company_name, row.title) in applied:
             continue
         visible.append(_serialize(row))
+    visible.sort(key=_by_importance)
     return visible
 
 
@@ -183,6 +197,15 @@ def _apply_url(value: str) -> str:
     return url
 
 
+def _importance_score(value: object) -> int:
+    """Accept 0-100. Empty is None at the caller, and 0 is a real low score."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SuggestionError("importance_score must be an integer from 0 to 100")
+    if value < 0 or value > 100:
+        raise SuggestionError("importance_score must be an integer from 0 to 100")
+    return value
+
+
 def _conflict(
     session: Session, company: str, title: str, *, exclude_id: int | None = None
 ) -> str | None:
@@ -205,8 +228,13 @@ def create_suggestion(
     apply_url: str,
     pay: str | None = None,
     requirements_summary: str = "",
+    importance_score: int | None = None,
 ) -> dict:
-    """Store one suggestion. Does not call xAI and does not save a job-site login."""
+    """Store one suggestion. Does not call xAI and does not save a job-site login.
+
+    Omitting importance_score leaves it empty. The app does not calculate it.
+    """
+    score = None if importance_score is None else _importance_score(importance_score)
     clean_title = _label(title, "title", 500)
     clean_company = _label(company, "company", 255)
     conflict = _conflict(session, clean_company, clean_title)
@@ -218,6 +246,7 @@ def create_suggestion(
         pay=_clean_pay(pay),
         requirements_summary=_summary(requirements_summary),
         apply_url=_apply_url(apply_url),
+        importance_score=score,
     )
     session.add(row)
     session.commit()
@@ -229,13 +258,23 @@ def update_suggestion(session: Session, suggestion_id: int, changes: dict) -> di
     """Update fields on one suggestion. An empty change set is rejected."""
     if not changes:
         raise SuggestionError("Provide a field to update")
-    unknown = set(changes) - {"title", "company", "pay", "requirements_summary", "apply_url"}
+    unknown = set(changes) - {
+        "title",
+        "company",
+        "pay",
+        "requirements_summary",
+        "apply_url",
+        "importance_score",
+    }
     if unknown:
         raise SuggestionError("Unknown suggestion fields")
 
     row = session.query(JobSuggestion).filter(JobSuggestion.id == suggestion_id).first()
     if row is None:
         raise SuggestionError("Suggestion not found")
+    score = (
+        _importance_score(changes["importance_score"]) if "importance_score" in changes else None
+    )
 
     title = _label(str(changes["title"]), "title", 500) if "title" in changes else row.title
     if "company" in changes:
@@ -256,6 +295,8 @@ def update_suggestion(session: Session, suggestion_id: int, changes: dict) -> di
         row.requirements_summary = _summary(str(changes["requirements_summary"] or ""))
     if "apply_url" in changes:
         row.apply_url = _apply_url(str(changes["apply_url"]))
+    if "importance_score" in changes:
+        row.importance_score = score
 
     session.commit()
     session.refresh(row)

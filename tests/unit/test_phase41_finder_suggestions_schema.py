@@ -127,8 +127,10 @@ def test_finder_suggestions_on_database_missing_dismissed_column(monkeypatch):
             "pay": None,
             "requirements_summary": "Python",
             "apply_url": "https://acme.example/apply",
+            "importance_score": None,
         }
     ]
     columns = {column["name"] for column in inspect(engine).get_columns("job_suggestions")}
     assert "dismissed" in columns
+    assert "importance_score" in columns
     assert "qualification_profiles" not in inspect(engine).get_table_names()
