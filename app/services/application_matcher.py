@@ -21,15 +21,21 @@ def match_or_create_application(
     app_repo: ApplicationRepository,
     company_name: str,
     position_name: str,
+    *,
+    company_only: bool = True,
 ) -> tuple[Application, bool]:
     """Return ``(application, created)``.
 
     Linking does not change the stored company name or title.
     Unknown company or title never uses the company-only rule; that path
-    still creates or reuses the Unknown row.
+    still creates or reuses the Unknown row. ``company_only=False`` requires
+    the normalized title to match too, so a second role at one company is
+    its own application.
     """
     if not _uses_unknown(company_name, position_name):
-        linked = _find_link_target(app_repo, company_name, position_name)
+        linked = _find_link_target(
+            app_repo, company_name, position_name, company_only=company_only
+        )
         if linked is not None:
             return linked, False
 
@@ -55,6 +61,8 @@ def _find_link_target(
     app_repo: ApplicationRepository,
     company_name: str,
     position_name: str,
+    *,
+    company_only: bool = True,
 ) -> Application | None:
     target_company = normalize_label(company_name)
     target_title = normalize_label(position_name)
@@ -74,7 +82,7 @@ def _find_link_target(
         # Several rows can already share a normalized company and title.
         # Link the oldest so a punctuation variant does not insert another.
         return min(pair_matches, key=lambda row: row.id)
-    if len(company_matches) == 1:
+    if company_only and len(company_matches) == 1:
         return company_matches[0]
     return None
 

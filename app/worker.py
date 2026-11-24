@@ -33,7 +33,7 @@ from app.config import get_settings
 from app.db import models
 from app.db.database import SessionLocal, engine
 from app.db.repositories.analysis_repo import AnalysisRepository
-from app.db.repositories.application_repo import ApplicationRepository
+from app.db.repositories.application_repo import ApplicationRepository, as_naive_utc
 from app.db.repositories.company_repo import CompanyRepository
 from app.db.repositories.email_repo import EmailRepository
 from app.db.repositories.worker_run_repo import WorkerRunRepository
@@ -333,11 +333,15 @@ def run(
                         position_name,
                     )
                     analysis_repo.link_to_application(analysis, application.id)
-                    # A new row is stamped last_updated=now, so update_stage
-                    # treats a historical rejection as older and would leave
-                    # the default "applied". Record the email's stage first.
-                    if created and email_data.stage:
-                        application.stage = email_data.stage
+                    # A new row is stamped last_updated=now. That is newer than
+                    # every saved email, so update_stage would treat the rest of
+                    # this run — including a later interview or offer — as older
+                    # and leave the creating email's stage in place. Anchor the
+                    # clock to this email before recording its stage.
+                    if created:
+                        application.last_updated = as_naive_utc(received)
+                        if email_data.stage:
+                            application.stage = email_data.stage
                     # A missing Date header used to skip the stage write, so a
                     # rejection stayed "applied". Use the same timestamp stored
                     # on the email row.

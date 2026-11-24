@@ -10,6 +10,13 @@ from app.email_client.application_signals import stage_rank
 from app.llm.normalization import canonicalize_stage
 
 
+def as_naive_utc(value: datetime) -> datetime:
+    """UTC wall time without tzinfo, so aware and naive timestamps compare equal."""
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
 def _with_company(query):
     return query.options(joinedload(Application.company))
 
@@ -104,14 +111,8 @@ class ApplicationRepository(BaseRepository):
     ) -> None:
         if not new_stage or date is None:
             return
-        date_naive = (
-            date.astimezone(UTC).replace(tzinfo=None) if date.tzinfo else date
-        )
-        last_updated_naive = (
-            application.last_updated.astimezone(UTC).replace(tzinfo=None)
-            if application.last_updated.tzinfo
-            else application.last_updated
-        )
+        date_naive = as_naive_utc(date)
+        last_updated_naive = as_naive_utc(application.last_updated)
         if date_naive <= last_updated_naive:
             return
         # A newer "applied" must not walk an interview or offer backwards.
