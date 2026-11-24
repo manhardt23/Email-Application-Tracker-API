@@ -10,6 +10,7 @@ import { Input } from "../components/ui/Input";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
 import {
+  sortJobSuggestions,
   useApplySuggestion,
   useDismissSuggestion,
   useFindJobs,
@@ -17,6 +18,43 @@ import {
 } from "../hooks/useFinder";
 import { errorMessage } from "../lib/format";
 import type { JobSuggestion } from "../types/api";
+
+function ImportanceScore({ score }: { score: number | null | undefined }) {
+  const empty = score == null;
+  const tone = empty
+    ? {
+        fg: "var(--color-text-3)",
+        bg: "var(--color-sunken)",
+        border: "var(--color-line)",
+      }
+    : score >= 70
+      ? {
+          fg: "var(--color-success-fg)",
+          bg: "var(--color-success-bg)",
+          border: "var(--color-success-border)",
+        }
+      : score >= 40
+        ? {
+            fg: "var(--color-warning-fg)",
+            bg: "var(--color-warning-bg)",
+            border: "var(--color-warning-border)",
+          }
+        : {
+            fg: "var(--color-danger-fg)",
+            bg: "var(--color-danger-bg)",
+            border: "var(--color-danger-border)",
+          };
+  return (
+    <span
+      className="inline-flex h-6 shrink-0 items-center justify-center rounded-full border px-2 font-mono text-[12px] font-medium"
+      style={{ color: tone.fg, backgroundColor: tone.bg, borderColor: tone.border }}
+      aria-label={empty ? "Importance not scored" : `Importance ${score}`}
+      data-importance={empty ? "empty" : String(score)}
+    >
+      {empty ? "Not scored" : score}
+    </span>
+  );
+}
 
 export function JobFinder() {
   const suggestions = useJobSuggestions();
@@ -116,11 +154,14 @@ export function JobFinder() {
         />
       ) : (
         <div className="space-y-3">
-          {(suggestions.data ?? []).map((job) => (
+          {sortJobSuggestions(suggestions.data ?? []).map((job) => (
             <Card key={job.id}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
                 <div className="min-w-0">
-                  <h3 className="truncate text-[14px] font-medium text-text">{job.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <ImportanceScore score={job.importance_score} />
+                    <h3 className="truncate text-[14px] font-medium text-text">{job.title}</h3>
+                  </div>
                   <p className="mt-1 font-mono text-[12px] text-text-3">{job.company}</p>
                   {job.pay ? (
                     <p className="mt-2 text-[13px] text-text">{job.pay}</p>

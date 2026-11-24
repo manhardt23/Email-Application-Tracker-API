@@ -4,10 +4,23 @@ import { api } from "../lib/api";
 import { queryKeys } from "../lib/query-keys";
 import type { FindJobsResponse, JobSuggestion } from "../types/api";
 
+/** Highest score first. Unscored rows stay last, in their existing order. */
+export function sortJobSuggestions(items: JobSuggestion[]): JobSuggestion[] {
+  return [...items].sort((a, b) => {
+    const aScore = a.importance_score;
+    const bScore = b.importance_score;
+    if (aScore == null && bScore == null) return 0;
+    if (aScore == null) return 1;
+    if (bScore == null) return -1;
+    return bScore - aScore;
+  });
+}
+
 export function useJobSuggestions() {
   return useQuery({
     queryKey: queryKeys.finder.suggestions,
-    queryFn: async () => (await api.get<JobSuggestion[]>("/finder/suggestions")).data,
+    queryFn: async () =>
+      sortJobSuggestions((await api.get<JobSuggestion[]>("/finder/suggestions")).data),
   });
 }
 

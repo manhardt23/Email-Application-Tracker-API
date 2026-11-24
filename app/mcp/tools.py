@@ -90,6 +90,7 @@ def create_job_suggestion(
     apply_url: str,
     pay: str | None = None,
     requirements_summary: str = "",
+    importance_score: int | None = None,
 ) -> dict:
     with session_scope() as db:
         try:
@@ -100,6 +101,7 @@ def create_job_suggestion(
                 apply_url=apply_url,
                 pay=pay,
                 requirements_summary=requirements_summary,
+                importance_score=importance_score,
             )
         except SuggestionError as exc:
             raise ToolError(str(exc)) from exc
@@ -112,6 +114,7 @@ def update_job_suggestion(
     pay: str | None = None,
     requirements_summary: str | None = None,
     apply_url: str | None = None,
+    importance_score: int | None = None,
 ) -> dict:
     changes: dict = {}
     if title is not None:
@@ -124,6 +127,8 @@ def update_job_suggestion(
         changes["requirements_summary"] = requirements_summary
     if apply_url is not None:
         changes["apply_url"] = apply_url
+    if importance_score is not None:
+        changes["importance_score"] = importance_score
     with session_scope() as db:
         try:
             return update_suggestion(db, suggestion_id, changes)

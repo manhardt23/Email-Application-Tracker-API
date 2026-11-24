@@ -26,6 +26,7 @@ SUGGESTION_KEYS = {
     "pay",
     "requirements_summary",
     "apply_url",
+    "importance_score",
 }
 
 
@@ -53,6 +54,7 @@ def test_suggestions_do_not_include_a_profile_fit(client, db):
     assert set(listed[0]) == SUGGESTION_KEYS
     assert listed[0]["title"] == "Backend Engineer"
     assert listed[0]["pay"] is None
+    assert listed[0]["importance_score"] is None
     assert "qualification_fit" not in listed[0]
     assert "target_titles" not in listed[0]
     assert "skills" not in listed[0]

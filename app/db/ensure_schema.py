@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 _MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
 FINDER_PROFILE_MIGRATION = "005_drop_finder_profile.sql"
+IMPORTANCE_SCORE_MIGRATION = "006_job_importance_score.sql"
 
 
 def _statements(script: str) -> list[str]:
@@ -63,3 +64,43 @@ def _sqlite_statements(engine: Engine, script: str) -> list[str]:
     # SQLite parses `IF NOT EXISTS` on CREATE TABLE, not on ADD COLUMN.
     statements.append(alter.replace("IF NOT EXISTS ", "", 1))
     return statements
+
+
+def apply_job_importance_score(engine: Engine) -> None:
+    """Run migrations/006_job_importance_score.sql.
+
+    create_all does not add columns to a table that already exists. An existing
+    job_suggestions table has no importance_score until this migration runs.
+    Null means the suggestion has not been scored. 0 is a real low score.
+
+    Postgres runs the migration file. SQLite tests use the same change without
+    ``ADD COLUMN IF NOT EXISTS``, which SQLite rejects.
+    """
+    script = (_MIGRATIONS / IMPORTANCE_SCORE_MIGRATION).read_text()
+    if engine.dialect.name == "postgresql":
+        statements = _statements(script)
+    else:
+        statements = _sqlite_importance_statements(engine, script)
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+    logger.info("Applied %s", IMPORTANCE_SCORE_MIGRATION)
+
+
+def _sqlite_importance_statements(engine: Engine, script: str) -> list[str]:
+    inspector = inspect(engine)
+    if "job_suggestions" not in set(inspector.get_table_names()):
+        return []
+    columns = {column["name"] for column in inspector.get_columns("job_suggestions")}
+    if "importance_score" in columns:
+        return []
+    alter = next(
+        (statement for statement in _statements(script) if statement.upper().startswith("ALTER")),
+        None,
+    )
+    if alter is None:
+        return []
+    # SQLite parses `IF NOT EXISTS` on CREATE TABLE, not on ADD COLUMN.
+    return [alter.replace("IF NOT EXISTS ", "", 1)]

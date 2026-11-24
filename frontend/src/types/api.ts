@@ -185,6 +185,8 @@ export type JobSuggestion = {
   pay: string | null;
   requirements_summary: string;
   apply_url: string;
+  /** 0-100. Null means not scored. 0 is a real low score. */
+  importance_score: number | null;
 };
 
 export type FindJobsResponse = {
