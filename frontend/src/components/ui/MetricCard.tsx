@@ -5,15 +5,19 @@ export function MetricCard({
   label,
   value,
   suffix,
+  hint,
+  title,
   loading = false,
 }: {
   label: string;
   value: number | string;
   suffix?: string;
+  hint?: string;
+  title?: string;
   loading?: boolean;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" title={title}>
       {loading ? (
         <Skeleton className="h-[31px] w-20" />
       ) : (
@@ -23,6 +27,7 @@ export function MetricCard({
         </div>
       )}
       <div className="mt-2 text-[12px] text-text-3">{label}</div>
+      {hint ? <div className="mt-0.5 text-[11px] text-text-3">{hint}</div> : null}
     </Card>
   );
 }
