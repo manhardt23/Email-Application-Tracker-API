@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
+import { BrandMark } from "../components/BrandMark";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { useLogin } from "../hooks/useAuth";
@@ -29,12 +30,7 @@ export function Login() {
     <main className="flex min-h-screen items-center justify-center bg-page p-4">
       <div className="w-full max-w-[340px] rounded-[10px] border border-line bg-surface p-6">
         <div className="mb-6 flex items-center gap-2.5">
-          <div
-            className="flex size-[26px] items-center justify-center rounded-[5px] border-[1.5px] border-text text-[13px] font-bold text-text"
-            aria-hidden
-          >
-            A
-          </div>
+          <BrandMark />
           <div className="leading-tight">
             <div className="text-[14px] font-semibold text-text">App Tracker</div>
             <div className="font-mono text-[11px] text-text-3">Email Application Tracker</div>

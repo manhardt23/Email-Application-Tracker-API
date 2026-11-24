@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#1c1917" />
     <title>Application Tracker</title>
     <meta
       name="description"
@@ -24,15 +25,44 @@
       name="twitter:description"
       content="Application Tracker is a private dashboard for job applications, related email, and pipeline status."
     />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" href="/favicon-48x48.png" sizes="48x48" />
+    <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Application Tracker",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "url": "https://jemanhardt.dev/",
-        "description": "Application Tracker is a private dashboard for job applications, related email, and pipeline status."
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Application Tracker",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://jemanhardt.dev/",
+            "description": "Application Tracker is a private dashboard for job applications, related email, and pipeline status."
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://jemanhardt.dev/#organization",
+            "name": "Application Tracker",
+            "url": "https://jemanhardt.dev/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://jemanhardt.dev/brand/logo.png",
+              "width": 512,
+              "height": 512
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://jemanhardt.dev/#website",
+            "name": "Application Tracker",
+            "url": "https://jemanhardt.dev/",
+            "publisher": { "@id": "https://jemanhardt.dev/#organization" }
+          }
+        ]
       }
     </script>
   </head>
