@@ -10,7 +10,7 @@ from starlette.staticfiles import StaticFiles
 from app.api.v1.stats import router as stats_router
 from app.db import models
 from app.db.database import engine
-from app.db.ensure_schema import apply_drop_finder_profile
+from app.db.ensure_schema import apply_drop_finder_profile, apply_job_importance_score
 from app.mcp.auth import mcp_credential_configured
 from app.mcp.server import build_mcp, protected_mcp_app
 from app.middleware.rate_limit import configure_rate_limiting
@@ -39,9 +39,11 @@ def create_app() -> FastAPI:
         # Ensure tables exist on startup.
         # Phase 2 will replace this with `alembic upgrade head`.
         # create_all does not alter an existing job_suggestions table, so an
-        # old database is still missing dismissed until 005 runs.
+        # old database is still missing dismissed until 005 runs, and
+        # importance_score until 006 runs.
         models.Base.metadata.create_all(bind=engine)
         apply_drop_finder_profile(engine)
+        apply_job_importance_score(engine)
         if not mcp_credential_configured():
             logger.warning(
                 "MCP_BEARER_TOKEN is not set. MCP requests are rejected until it is configured."

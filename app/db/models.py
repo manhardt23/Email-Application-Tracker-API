@@ -218,6 +218,8 @@ class JobSuggestion(Base):
     requirements_summary = Column(Text, nullable=False, default="", server_default="")
     apply_url = Column(String(2000), nullable=False)
     dismissed = Column(Boolean, server_default=false(), default=False, nullable=False)
+    # Null means not scored. 0 is a real low score. The app does not calculate it.
+    importance_score = Column(Integer, nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
