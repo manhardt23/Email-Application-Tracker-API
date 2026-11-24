@@ -45,16 +45,41 @@ export type StatusBreakdownSlice = {
   value: number;
 };
 
+export type DashboardGlance = {
+  total_applications: number;
+  funnel: StatusBreakdownSlice[];
+  other_stages: number;
+  responses_received: number;
+  response_rate: number;
+  this_week: number;
+  last_week: number;
+  last_applied_on: string | null;
+  days_since_last_application: number | null;
+  stale_days: number;
+  stale_applications: number;
+};
+
+export type RoleTitleCount = {
+  title: string;
+  applications: number;
+};
+
+export type RoleGroupBreakdown = {
+  id: string;
+  label: string;
+  applications: number;
+  titles: RoleTitleCount[];
+};
+
+export type RoleBreakdown = {
+  groups: RoleGroupBreakdown[];
+};
+
 export type RecentApplication = {
   company: string;
   role: string;
   status: string;
   date_applied: string;
-};
-
-export type TopCompany = {
-  company: string;
-  applications: number;
 };
 
 // --- Applications ---

@@ -1,5 +1,5 @@
 {
-  "name": "Email Application Tracker",
+  "name": "Application Tracker",
   "short_name": "App Tracker",
   "icons": [
     { "src": "/favicon-16x16.png", "sizes": "16x16", "type": "image/png" },

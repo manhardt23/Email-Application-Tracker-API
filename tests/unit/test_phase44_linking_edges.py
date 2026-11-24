@@ -576,6 +576,87 @@ def test_promote_new_rejection_is_not_stored_as_applied(client, db):
     assert stored.position == "Engineer"
 
 
+def test_promote_second_historical_email_advances_the_new_application(client, db):
+    """Creating from an older email must not freeze the stage at wall-clock now."""
+    first = _seed_email(
+        db,
+        company="Acme",
+        position="Engineer",
+        stage="applied",
+        message_id="p44-clock-applied",
+        uid="4416",
+        received=datetime(2026, 1, 15, tzinfo=UTC),
+        body="Thank you for applying. We received your application.",
+    )
+    second = _seed_email(
+        db,
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        message_id="p44-clock-interview",
+        uid="4417",
+        received=datetime(2026, 2, 15, tzinfo=UTC),
+        body="We would like to schedule an interview.",
+    )
+
+    created = _promote(client, first)
+    advanced = _promote(client, second)
+
+    assert created.status_code == 200
+    assert created.json()["created"] is True
+    assert created.json()["stage"] == "applied"
+    assert advanced.status_code == 200
+    assert advanced.json()["created"] is False
+    assert advanced.json()["application_id"] == created.json()["application_id"]
+    assert advanced.json()["stage"] == "interview"
+    db.expire_all()
+    assert db.query(Application).count() == 1
+    assert db.query(Application).one().stage == "interview"
+
+
+def test_promote_offer_after_interview_is_not_stuck_at_the_update_clock(client, db):
+    company = _seed_company(db, "Acme")
+    application = _seed_application(
+        db,
+        company,
+        "Engineer",
+        stage="applied",
+        last_updated=datetime(2026, 1, 1),
+    )
+    db.commit()
+    interview = _seed_email(
+        db,
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        message_id="p44-clock-iv",
+        uid="4418",
+        received=datetime(2026, 8, 1, tzinfo=UTC),
+        body="We would like to schedule an interview.",
+    )
+    offer = _seed_email(
+        db,
+        company="Acme",
+        position="Engineer",
+        stage="offer",
+        message_id="p44-clock-offer",
+        uid="4419",
+        received=datetime(2026, 9, 1, tzinfo=UTC),
+        body="We are pleased to extend an offer for the Engineer role.",
+    )
+
+    first = _promote(client, interview)
+    second = _promote(client, offer)
+
+    assert first.status_code == 200
+    assert first.json()["stage"] == "interview"
+    assert second.status_code == 200
+    assert second.json()["application_id"] == application.id
+    assert second.json()["stage"] == "offer"
+    db.expire_all()
+    assert db.get(Application, application.id).stage == "offer"
+
+
 def test_promote_same_email_twice_does_not_insert_another_application(client, db):
     email = _seed_email(
         db,
@@ -837,6 +918,84 @@ def test_worker_new_rejection_is_not_stored_as_applied(monkeypatch):
         assert stored.stage == "rejected"
         assert stored.position == "Engineer"
         assert stored.company.name == "Acme"
+    finally:
+        check.close()
+
+
+def test_worker_later_email_in_the_same_run_advances_a_new_application(monkeypatch):
+    """Oldest-first history (backfill) must not keep the first email's stage."""
+    Session = _memory_session()
+    worker_module = _bind_worker(monkeypatch, Session)
+    applied = _application_email(
+        message_id="<p44-clock-applied@test>",
+        uid="4429",
+        company="Acme",
+        position="Engineer",
+        stage="applied",
+        when=datetime(2026, 1, 1, tzinfo=UTC),
+        body="Thank you for applying. We received your application.",
+    )
+    interview = _application_email(
+        message_id="<p44-clock-interview@test>",
+        uid="4430",
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        when=datetime(2026, 2, 1, tzinfo=UTC),
+        body="We would like to schedule an interview.",
+    )
+    offer = _application_email(
+        message_id="<p44-clock-offer@test>",
+        uid="4431",
+        company="Acme",
+        position="Engineer",
+        stage="offer",
+        when=datetime(2026, 3, 1, tzinfo=UTC),
+        body="We are pleased to extend an offer for the Engineer role.",
+    )
+
+    assert _run_worker(monkeypatch, worker_module, [applied, interview, offer]) == 0
+
+    check = Session()
+    try:
+        assert check.query(Application).count() == 1
+        stored = check.query(Application).one()
+        assert stored.stage == "offer"
+        assert stored.position == "Engineer"
+        assert stored.company.name == "Acme"
+        assert check.query(Email).count() == 3
+    finally:
+        check.close()
+
+
+def test_worker_later_applied_email_does_not_walk_a_new_interview_back(monkeypatch):
+    Session = _memory_session()
+    worker_module = _bind_worker(monkeypatch, Session)
+    interview = _application_email(
+        message_id="<p44-clock-keep-iv@test>",
+        uid="4432",
+        company="Acme",
+        position="Engineer",
+        stage="interview",
+        when=datetime(2026, 1, 1, tzinfo=UTC),
+        body="We would like to schedule an interview.",
+    )
+    applied = _application_email(
+        message_id="<p44-clock-keep-applied@test>",
+        uid="4433",
+        company="Acme",
+        position="Engineer",
+        stage="applied",
+        when=datetime(2026, 2, 1, tzinfo=UTC),
+        body="Thank you for applying. We received your application.",
+    )
+
+    assert _run_worker(monkeypatch, worker_module, [interview, applied]) == 0
+
+    check = Session()
+    try:
+        stored = check.query(Application).one()
+        assert stored.stage == "interview"
     finally:
         check.close()
 

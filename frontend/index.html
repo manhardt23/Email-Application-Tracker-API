@@ -5,7 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#1c1917" />
-    <title>Email Application Tracker</title>
+    <title>Application Tracker</title>
+    <meta
+      name="description"
+      content="Application Tracker is a private dashboard for job applications, related email, and pipeline status."
+    />
+    <link rel="canonical" href="https://jemanhardt.dev/" />
+    <meta property="og:site_name" content="Application Tracker" />
+    <meta property="og:title" content="Application Tracker" />
+    <meta
+      property="og:description"
+      content="Application Tracker is a private dashboard for job applications, related email, and pipeline status."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://jemanhardt.dev/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Application Tracker" />
+    <meta
+      name="twitter:description"
+      content="Application Tracker is a private dashboard for job applications, related email, and pipeline status."
+    />
     <link rel="icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="/favicon-48x48.png" sizes="48x48" />
     <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
@@ -17,9 +36,17 @@
         "@context": "https://schema.org",
         "@graph": [
           {
+            "@type": "WebApplication",
+            "name": "Application Tracker",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://jemanhardt.dev/",
+            "description": "Application Tracker is a private dashboard for job applications, related email, and pipeline status."
+          },
+          {
             "@type": "Organization",
             "@id": "https://jemanhardt.dev/#organization",
-            "name": "Email Application Tracker",
+            "name": "Application Tracker",
             "url": "https://jemanhardt.dev/",
             "logo": {
               "@type": "ImageObject",
@@ -31,7 +58,7 @@
           {
             "@type": "WebSite",
             "@id": "https://jemanhardt.dev/#website",
-            "name": "Email Application Tracker",
+            "name": "Application Tracker",
             "url": "https://jemanhardt.dev/",
             "publisher": { "@id": "https://jemanhardt.dev/#organization" }
           }

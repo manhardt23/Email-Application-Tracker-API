@@ -4,11 +4,14 @@ import { api } from "../lib/api";
 import { queryKeys } from "../lib/query-keys";
 import type {
   ApplicationsOverTimePoint,
+  DashboardGlance,
   DashboardMetrics,
   RecentApplication,
+  RoleBreakdown,
   StatusBreakdownSlice,
-  TopCompany,
 } from "../types/api";
+
+export type TrendGranularity = "day" | "week" | "month";
 
 export function useDashboardMetrics() {
   return useQuery({
@@ -17,13 +20,20 @@ export function useDashboardMetrics() {
   });
 }
 
-export function useApplicationsOverTime(days = 30) {
+export function useDashboardGlance() {
   return useQuery({
-    queryKey: queryKeys.dashboard.overTime(days),
+    queryKey: queryKeys.dashboard.glance,
+    queryFn: async () => (await api.get<DashboardGlance>("/dashboard/glance")).data,
+  });
+}
+
+export function useApplicationsOverTime(days: number, granularity: TrendGranularity) {
+  return useQuery({
+    queryKey: queryKeys.dashboard.overTime(days, granularity),
     queryFn: async () =>
       (
         await api.get<ApplicationsOverTimePoint[]>("/dashboard/applications-over-time", {
-          params: { days },
+          params: { days, granularity },
         })
       ).data,
   });
@@ -37,19 +47,18 @@ export function useStatusBreakdown() {
   });
 }
 
+export function useRoleBreakdown() {
+  return useQuery({
+    queryKey: queryKeys.dashboard.roles,
+    queryFn: async () => (await api.get<RoleBreakdown>("/dashboard/role-breakdown")).data,
+  });
+}
+
 export function useRecentApplications(limit = 8) {
   return useQuery({
     queryKey: queryKeys.dashboard.recent,
     queryFn: async () =>
       (await api.get<RecentApplication[]>("/dashboard/recent-applications", { params: { limit } }))
         .data,
-  });
-}
-
-export function useTopCompanies(limit = 5) {
-  return useQuery({
-    queryKey: queryKeys.dashboard.topCompanies,
-    queryFn: async () =>
-      (await api.get<TopCompany[]>("/dashboard/top-companies", { params: { limit } })).data,
   });
 }

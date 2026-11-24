@@ -216,15 +216,28 @@ def promote_email_to_application(
         position_name,
     )
 
+    current_stage = application.stage
+    previous_updated = application.last_updated
     if stage_value:
-        application.stage = _merge_promoted_stage(
-            current=application.stage,
+        merged = _merge_promoted_stage(
+            current=current_stage,
             chosen=stage_value,
             created=created,
             specific_request=_requested_promote_stage(body) in _SPECIFIC_PROMOTE_STAGES,
             email_received=email.received_date,
-            last_updated=application.last_updated,
+            last_updated=previous_updated,
         )
+        application.stage = merged
+        # Assign last_updated ourselves. The column onupdate otherwise stamps
+        # wall-clock now whenever the stage changes, and every real email is
+        # then "older" than that stamp, so the next promotion cannot advance.
+        if created:
+            application.last_updated = _as_utc_naive(email.received_date)
+        elif merged != current_stage:
+            if _received_is_newer(email.received_date, previous_updated):
+                application.last_updated = _as_utc_naive(email.received_date)
+            elif previous_updated is not None:
+                application.last_updated = _as_utc_naive(previous_updated)
 
     if analysis is None:
         classification = EmailClassification(

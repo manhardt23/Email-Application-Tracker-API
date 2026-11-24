@@ -1,4 +1,4 @@
-"""Favicon, manifest, and logo structured data stay on the existing site name."""
+"""Favicon, manifest, and logo structured data use the public site name."""
 
 import json
 import struct
@@ -34,7 +34,7 @@ def _json_ld() -> dict:
 
 def test_homepage_keeps_its_title_and_points_at_the_icons():
     html = INDEX.read_text()
-    assert "<title>Email Application Tracker</title>" in html
+    assert "<title>Application Tracker</title>" in html
     assert html.count("<title>") == 1
     for href in (
         "/favicon.ico",
@@ -52,14 +52,14 @@ def test_structured_data_is_the_site_name_url_and_logo_only():
     organization = next(node for node in graph if node["@type"] == "Organization")
     website = next(node for node in graph if node["@type"] == "WebSite")
 
-    assert organization["name"] == "Email Application Tracker"
+    assert organization["name"] == "Application Tracker"
     assert organization["url"] == "https://jemanhardt.dev/"
     assert organization["logo"]["url"] == "https://jemanhardt.dev/brand/logo.png"
     assert organization["logo"]["width"] == 512
     assert organization["logo"]["height"] == 512
     assert set(organization) == {"@type", "@id", "name", "url", "logo"}
 
-    assert website["name"] == "Email Application Tracker"
+    assert website["name"] == "Application Tracker"
     assert website["url"] == "https://jemanhardt.dev/"
     assert website["publisher"] == {"@id": "https://jemanhardt.dev/#organization"}
     assert set(website) == {"@type", "@id", "name", "url", "publisher"}
@@ -67,7 +67,7 @@ def test_structured_data_is_the_site_name_url_and_logo_only():
 
 def test_manifest_lists_the_icon_files():
     manifest = json.loads((PUBLIC / "site.webmanifest").read_text())
-    assert manifest["name"] == "Email Application Tracker"
+    assert manifest["name"] == "Application Tracker"
     assert manifest["short_name"] == "App Tracker"
     icons = {icon["sizes"]: icon["src"] for icon in manifest["icons"]}
     assert icons["16x16"] == "/favicon-16x16.png"
