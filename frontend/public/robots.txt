@@ -9,3 +9,4 @@ Disallow: /redoc
 Disallow: /openapi.json
 
 Sitemap: https://jemanhardt.dev/sitemap.xml
+Sitemap: https://tracker.jemanhardt.dev/sitemap.xml

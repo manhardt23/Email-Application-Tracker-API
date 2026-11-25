@@ -9,6 +9,7 @@ SITEMAP = ROOT / "frontend" / "public" / "sitemap.xml"
 NGINX = ROOT / "nginx" / "conf.d" / "tracker.conf"
 
 CANONICAL = "https://jemanhardt.dev/"
+TRACKER = "https://tracker.jemanhardt.dev/"
 DESCRIPTION = (
     "Application Tracker is a private dashboard for job applications, "
     "related email, and pipeline status."
@@ -20,6 +21,7 @@ def test_public_html_identifies_the_app_not_a_person():
     assert "<title>Application Tracker</title>" in html
     assert f'<meta\n      name="description"\n      content="{DESCRIPTION}"' in html
     assert f'<link rel="canonical" href="{CANONICAL}" />' in html
+    assert f'<link rel="alternate" href="{TRACKER}" />' in html
     assert '<meta property="og:site_name" content="Application Tracker" />' in html
     assert '<meta property="og:title" content="Application Tracker" />' in html
     assert f'<meta\n      property="og:description"\n      content="{DESCRIPTION}"' in html
@@ -31,6 +33,7 @@ def test_public_html_identifies_the_app_not_a_person():
     assert '"@type": "WebApplication"' in html
     assert '"name": "Application Tracker"' in html
     assert f'"url": "{CANONICAL}"' in html
+    assert html.count(f'"sameAs": "{TRACKER}"') == 3
     lowered = html.lower()
     assert "jacob manhardt" not in lowered
     assert "linkedin" not in lowered
@@ -40,13 +43,15 @@ def test_public_html_identifies_the_app_not_a_person():
     assert '"@type": "person"' not in lowered
 
 
-def test_robots_and_sitemap_use_the_current_host():
+def test_robots_and_sitemap_list_both_hosts():
     robots = ROBOTS.read_text()
     sitemap = SITEMAP.read_text()
     assert "Sitemap: https://jemanhardt.dev/sitemap.xml" in robots
+    assert "Sitemap: https://tracker.jemanhardt.dev/sitemap.xml" in robots
     assert "Disallow: /mcp" in robots
     assert "Allow: /" in robots
     assert "<loc>https://jemanhardt.dev/</loc>" in sitemap
+    assert "<loc>https://tracker.jemanhardt.dev/</loc>" in sitemap
     combined = (robots + sitemap).lower()
     assert "jacob" not in combined
     assert "linkedin" not in combined
@@ -54,5 +59,8 @@ def test_robots_and_sitemap_use_the_current_host():
 
 def test_seo_does_not_retarget_the_host_or_mcp_path():
     nginx = NGINX.read_text()
+    readme = (ROOT / "README.md").read_text()
     assert "server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;" in nginx
     assert "location /mcp {" in nginx
+    assert "https://jemanhardt.dev/mcp" in readme
+    assert "tracker.jemanhardt.dev/mcp" not in readme

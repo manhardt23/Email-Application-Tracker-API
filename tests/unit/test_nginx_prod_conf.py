@@ -18,6 +18,10 @@ def test_only_tracker_conf_is_loaded_and_reresolves_api():
     ) == 2
     assert "location /mcp {" in text
     assert "proxy_pass http://api:8000;" not in text
+    example = (CONF_DIR / "tracker.https.conf.example").read_text()
+    assert example.count(
+        "server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;"
+    ) == 2
 
 
 def test_deploy_overwrites_host_conf_and_fails_when_api_is_unhealthy():
