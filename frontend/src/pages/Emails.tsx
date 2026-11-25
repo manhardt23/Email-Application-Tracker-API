@@ -113,26 +113,37 @@ export function Emails() {
         ) : (
           <>
             <div className="p-2">
-              <Table>
+              <Table className="table-fixed border-separate border-spacing-0">
+                <colgroup>
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                  <col className="w-60" />
+                </colgroup>
                 <thead>
                   <tr>
                     <Th className="pl-3">From</Th>
                     <Th>Subject</Th>
                     <Th>Classification</Th>
                     <Th>Received</Th>
-                    <Th className="text-right">Action</Th>
+                    <Th className="sticky right-0 z-20 bg-surface text-right">Action</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((e) => (
                     <Tr key={e.id}>
-                      <Td className="pl-3 font-mono text-[12px] text-text">{e.sender}</Td>
-                      <Td className="max-w-[280px] truncate text-text">{e.subject || "(no subject)"}</Td>
-                      <Td>
+                      <Td className="truncate pl-3 font-mono text-[12px] text-text" title={e.sender}>
+                        {e.sender}
+                      </Td>
+                      <Td className="truncate text-text" title={e.subject || "(no subject)"}>
+                        {e.subject || "(no subject)"}
+                      </Td>
+                      <Td className="overflow-hidden">
                         <ClassificationTag email={e} />
                       </Td>
-                      <Td className="font-mono text-text-3">{formatDateTime(e.received_date)}</Td>
-                      <Td className="text-right">
+                      <Td className="truncate font-mono text-text-3">{formatDateTime(e.received_date)}</Td>
+                      <Td className="sticky right-0 z-10 whitespace-nowrap bg-surface text-right">
                         {e.application_id ? (
                           <div className="flex items-center justify-end gap-2.5">
                             <Link
