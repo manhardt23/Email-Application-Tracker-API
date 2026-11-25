@@ -293,6 +293,34 @@ def test_fetch_recent_emails_respects_limit(monkeypatch):
     assert len(results) == 3
 
 
+def test_fetch_recent_emails_keeps_oldest_uid_window(monkeypatch):
+    """A short run must not skip the oldest unprocessed UIDs.
+
+    The worker records the highest UID it fetched and resumes after that.
+    Selecting the newest slice would drop every older message in the gap.
+    """
+    raw_by_uid: dict[bytes, bytes] = {}
+    for idx in range(1, 6):
+        raw_by_uid[str(idx).encode()] = _build_email_bytes(
+            message_id=f"<window-{idx}@example.test>",
+            subject=f"Window {idx}",
+            sender=f"window{idx}@example.test",
+            body=f"Body {idx}",
+        )
+
+    fake_mail = _FakeMail(raw_by_uid)
+    monkeypatch.setattr(client, "_connect_to_inbox", lambda: fake_mail)
+
+    results = client.fetch_recent_emails(limit=3, since_uid=1)
+
+    assert [item["uid"] for item in results] == ["3", "2", "1"]
+    assert [item["message_id"] for item in results] == [
+        "<window-3@example.test>",
+        "<window-2@example.test>",
+        "<window-1@example.test>",
+    ]
+
+
 def test_fetch_recent_emails_malformed_bytes(monkeypatch):
     raw_valid = _build_email_bytes(
         message_id="<valid-after-garbage@example.test>",
