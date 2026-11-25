@@ -54,5 +54,5 @@ def test_robots_and_sitemap_use_the_current_host():
 
 def test_seo_does_not_retarget_the_host_or_mcp_path():
     nginx = NGINX.read_text()
-    assert "server_name jemanhardt.dev www.jemanhardt.dev;" in nginx
+    assert "server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;" in nginx
     assert "location /mcp {" in nginx

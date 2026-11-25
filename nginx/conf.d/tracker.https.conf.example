@@ -4,7 +4,7 @@
 
 server {
     listen 80;
-    server_name jemanhardt.dev www.jemanhardt.dev;
+    server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;
 
     location / {
         return 301 https://$host$request_uri;
@@ -13,7 +13,7 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name jemanhardt.dev www.jemanhardt.dev;
+    server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;
 
     ssl_certificate /etc/nginx/certs/origin.pem;
     ssl_certificate_key /etc/nginx/certs/origin.key;
