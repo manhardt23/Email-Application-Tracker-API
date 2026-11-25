@@ -54,15 +54,18 @@ def test_structured_data_is_the_site_name_url_and_logo_only():
 
     assert organization["name"] == "Application Tracker"
     assert organization["url"] == "https://jemanhardt.dev/"
+    assert organization["sameAs"] == "https://tracker.jemanhardt.dev/"
     assert organization["logo"]["url"] == "https://jemanhardt.dev/brand/logo.png"
+    assert organization["logo"]["sameAs"] == "https://tracker.jemanhardt.dev/brand/logo.png"
     assert organization["logo"]["width"] == 512
     assert organization["logo"]["height"] == 512
-    assert set(organization) == {"@type", "@id", "name", "url", "logo"}
+    assert set(organization) == {"@type", "@id", "name", "url", "sameAs", "logo"}
 
     assert website["name"] == "Application Tracker"
     assert website["url"] == "https://jemanhardt.dev/"
+    assert website["sameAs"] == "https://tracker.jemanhardt.dev/"
     assert website["publisher"] == {"@id": "https://jemanhardt.dev/#organization"}
-    assert set(website) == {"@type", "@id", "name", "url", "publisher"}
+    assert set(website) == {"@type", "@id", "name", "url", "sameAs", "publisher"}
 
 
 def test_manifest_lists_the_icon_files():

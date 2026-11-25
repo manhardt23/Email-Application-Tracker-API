@@ -13,8 +13,15 @@ def test_only_tracker_conf_is_loaded_and_reresolves_api():
     assert "resolver 127.0.0.11 valid=10s ipv6=off;" in text
     assert "set $api_backend api:8000;" in text
     assert "proxy_pass http://$api_backend;" in text
-    assert "server_name jemanhardt.dev www.jemanhardt.dev;" in text
+    assert text.count(
+        "server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;"
+    ) == 2
+    assert "location /mcp {" in text
     assert "proxy_pass http://api:8000;" not in text
+    example = (CONF_DIR / "tracker.https.conf.example").read_text()
+    assert example.count(
+        "server_name jemanhardt.dev www.jemanhardt.dev tracker.jemanhardt.dev;"
+    ) == 2
 
 
 def test_deploy_overwrites_host_conf_and_fails_when_api_is_unhealthy():
