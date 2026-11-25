@@ -28,6 +28,7 @@ import {
 import type { DashboardGlance, RoleGroupBreakdown } from "../types/api";
 
 const RANGES = [
+  { days: 7, label: "7 days" },
   { days: 30, label: "30 days" },
   { days: 90, label: "90 days" },
   { days: 180, label: "180 days" },
@@ -45,7 +46,7 @@ type TrendRange = (typeof RANGES)[number]["days"];
 
 export function Dashboard() {
   const [range, setRange] = useState<TrendRange>(90);
-  const [granularity, setGranularity] = useState<Exclude<TrendGranularity, "day">>("week");
+  const [granularity, setGranularity] = useState<TrendGranularity>("week");
   const [roleId, setRoleId] = useState<string | null>(null);
 
   const glance = useDashboardGlance();
@@ -65,6 +66,12 @@ export function Dashboard() {
           title="Applications over time"
           action={
             <div className="flex flex-wrap items-center gap-1.5">
+              <FilterPill
+                active={granularity === "day"}
+                onClick={() => setGranularity("day")}
+              >
+                Day
+              </FilterPill>
               <FilterPill
                 active={granularity === "week"}
                 onClick={() => setGranularity("week")}
@@ -97,7 +104,7 @@ export function Dashboard() {
         ) : (overTime.data ?? []).length === 0 ? (
           <EmptyState
             title="No applications yet."
-            description="Weekly and monthly counts appear once an application has an applied date."
+            description="Daily, weekly, and monthly counts appear once an application has an applied date."
           />
         ) : (
           <div style={{ minHeight: 200 }}>
