@@ -41,7 +41,11 @@ def _connect_to_inbox(timeout: int | None = None):
 
 
 def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
-    """Fetch up to *limit* most-recent emails from the inbox.
+    """Fetch up to *limit* emails with UID >= *since_uid*.
+
+    The window is the oldest matching UIDs, returned newest-first. The worker
+    stores the highest UID it saw and resumes after it, so a newer slice would
+    leave the rest of this search unprocessed and then jump the cursor past it.
 
     Retries the connect+search phase once on transient network errors. Per-message
     fetch errors are logged and skipped without aborting the whole run (no log spam).
@@ -87,11 +91,9 @@ def fetch_recent_emails(limit: int, since_uid: int = 1) -> list[dict]:
             return []
 
         mail_uids = data[0].split()
-        recent_uids = (
-            list(reversed(mail_uids[-limit:]))
-            if len(mail_uids) > limit
-            else list(reversed(mail_uids))
-        )
+        # Oldest window, still newest-first inside it. mail_uids[-limit:] is the
+        # newest mail, and the worker cursor would then skip every UID before it.
+        recent_uids = list(reversed(mail_uids[:limit]))
         logger.debug(
             "IMAP search returned %d UIDs from start_uid=%d; processing %d",
             len(mail_uids),
