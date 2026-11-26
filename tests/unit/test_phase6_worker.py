@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 from app.services.worker_runtime import clear_max_emails_override, set_max_emails_override
 from app.worker import (
+    _MISSING_SENDER,
     EXIT_CONFIG,
     EXIT_NO_SLOT,
     EXIT_OK,
@@ -418,3 +419,64 @@ def test_run_applies_stage_when_email_date_missing(mock_gs):
     assert stage == "rejected"
     assert when is not None
     assert application.id == 3
+
+
+@patch("app.worker.get_settings")
+def test_run_saves_email_when_sender_missing_or_fields_exceed_columns(mock_gs):
+    """A missing From or an overlong field must not abort the check.
+
+    emails.sender is NOT NULL and several columns are length-limited. Postgres
+    rejects the insert, the cursor never advances, and every later check dies
+    on that same message.
+    """
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    email = SimpleNamespace(
+        uid="11",
+        message_id="<nosender@example.com>",
+        date=datetime(2026, 11, 26, tzinfo=UTC),
+        sender=None,
+        subject="S" * 1200,
+        body="body",
+        is_application=True,
+        company="C" * 300,
+        position="P" * 600,
+        stage="rejected",
+        confidence="high",
+    )
+    infra["processor"].email_list = [email]
+    infra["processor"].application_emails = [email]
+
+    email_repo = MagicMock()
+    email_repo.exists.return_value = False
+    email_repo.create.return_value = SimpleNamespace(id=8)
+    application = SimpleNamespace(id=4)
+    app_repo = MagicMock()
+    app_repo.get_all.return_value = []
+    app_repo.find_by_company_and_position.return_value = None
+    app_repo.find_or_create.return_value = application
+    company_repo = MagicMock()
+    company_repo.session.query.return_value.all.return_value = []
+    company_repo.find_or_create.return_value = SimpleNamespace(id=9)
+    analysis_repo = MagicMock()
+    analysis_repo.create.return_value = SimpleNamespace(needs_review=False)
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository", return_value=email_repo), \
+         patch("app.worker.CompanyRepository", return_value=company_repo), \
+         patch("app.worker.ApplicationRepository", return_value=app_repo), \
+         patch("app.worker.AnalysisRepository", return_value=analysis_repo), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run()
+
+    assert result == EXIT_OK
+    saved = email_repo.create.call_args.kwargs
+    assert saved["sender"] == _MISSING_SENDER
+    assert saved["subject"] == "S" * 1000
+    classification = analysis_repo.create.call_args.kwargs["classification"]
+    assert classification.company == "C" * 255
+    assert classification.position == "P" * 500
+    assert app_repo.find_or_create.call_args.args[1] == "P" * 500

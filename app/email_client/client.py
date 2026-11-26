@@ -181,22 +181,47 @@ def fetch_emails_by_date_range(
 
 
 def get_uid_received_date(uid: int, timeout: int | None = None) -> datetime | None:
-    """Return the Date header timestamp for a specific UID."""
+    """Return the Date header timestamp for a specific UID.
+
+    None means the UID is not in the mailbox. The worker treats None as a
+    missing cursor and jumps to the mailbox head, which drops every message
+    that arrived after that UID. A message that is present but has no Date
+    header, or a Date header ``parsedate_to_datetime`` cannot read (including
+    ISO-8601), is still in the mailbox. Return the current time so the cursor
+    stays put instead of skipping the mail that followed it, and so a bad
+    Date header does not crash the next check.
+    """
     mail = _connect_to_inbox(timeout=timeout)
     try:
         status, msg_data = mail.uid("fetch", str(uid), "(BODY.PEEK[HEADER.FIELDS (DATE)])")
-        if status != "OK" or not msg_data:
+        if status != "OK" or not msg_data or msg_data == [None]:
             return None
 
+        saw_message = False
         for part in msg_data:
-            if not isinstance(part, tuple):
+            if not isinstance(part, tuple) or len(part) < 2:
                 continue
-            msg = email.message_from_bytes(part[1])
+            payload = part[1]
+            if not isinstance(payload, (bytes, bytearray)):
+                continue
+            saw_message = True
+            msg = email.message_from_bytes(payload)
             date_str = msg.get("Date")
             if not date_str:
                 continue
-            parsed = parsedate_to_datetime(date_str)
+            try:
+                parsed = parsedate_to_datetime(date_str)
+            except (TypeError, ValueError, OverflowError):
+                logger.warning(
+                    "UID %s is present but Date header %r could not be parsed; keeping cursor",
+                    uid,
+                    date_str,
+                )
+                return datetime.now(UTC)
             return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+        if saw_message:
+            logger.info("UID %s is present but has no Date header; keeping cursor", uid)
+            return datetime.now(UTC)
         return None
     finally:
         _close_mail(mail)
