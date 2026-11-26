@@ -1,6 +1,6 @@
 import imaplib
 import importlib
-from datetime import datetime
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from types import SimpleNamespace
 
@@ -82,6 +82,66 @@ def test_fetch_recent_emails_includes_soft_required_nullable_keys(monkeypatch):
     assert parsed["received_date"] is None
     assert parsed["body_text"] is None
     assert isinstance(parsed["raw_headers"], dict)
+
+
+class _HeaderMail:
+    """IMAP stub whose fetch returns a Date header payload, or no message."""
+
+    def __init__(self, payload: bytes | None) -> None:
+        self._payload = payload
+
+    def uid(self, command, *args):  # noqa: ANN001
+        assert command == "fetch"
+        if self._payload is None:
+            return "OK", [None]
+        header = b"42 (BODY[HEADER.FIELDS (DATE)] {1}"
+        return "OK", [(header, self._payload), b")"]
+
+    def close(self) -> None:
+        return None
+
+    def logout(self) -> None:
+        return None
+
+
+def test_get_uid_received_date_parses_rfc_date(monkeypatch):
+    payload = b"Date: Tue, 26 Nov 2026 11:00:00 +0000\r\n\r\n"
+    monkeypatch.setattr(client, "_connect_to_inbox", lambda timeout=None: _HeaderMail(payload))
+
+    parsed = client.get_uid_received_date(42, timeout=5)
+
+    assert parsed == datetime(2026, 11, 26, 11, 0, tzinfo=UTC)
+
+
+def test_get_uid_received_date_keeps_cursor_when_date_is_iso(monkeypatch):
+    """ISO-8601 is a real Date header parsedate cannot read. Do not raise or reset."""
+    payload = b"Date: 2026-11-26T16:00:00Z\r\n\r\n"
+    monkeypatch.setattr(client, "_connect_to_inbox", lambda timeout=None: _HeaderMail(payload))
+    before = datetime.now(UTC)
+
+    parsed = client.get_uid_received_date(42, timeout=5)
+
+    after = datetime.now(UTC)
+    assert parsed is not None
+    assert before <= parsed <= after
+
+
+def test_get_uid_received_date_keeps_cursor_when_date_missing(monkeypatch):
+    payload = b"Subject: interview\r\n\r\n"
+    monkeypatch.setattr(client, "_connect_to_inbox", lambda timeout=None: _HeaderMail(payload))
+    before = datetime.now(UTC)
+
+    parsed = client.get_uid_received_date(42, timeout=5)
+
+    after = datetime.now(UTC)
+    assert parsed is not None
+    assert before <= parsed <= after
+
+
+def test_get_uid_received_date_none_when_uid_missing(monkeypatch):
+    monkeypatch.setattr(client, "_connect_to_inbox", lambda timeout=None: _HeaderMail(None))
+
+    assert client.get_uid_received_date(42, timeout=5) is None
 
 
 def test_worker_logs_duplicate_message_id_skip(monkeypatch, caplog):
