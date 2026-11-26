@@ -56,8 +56,25 @@ EXIT_PIPELINE = 1
 EXIT_NO_SLOT = 2
 EXIT_CONFIG = 3
 UID_STALE_DAYS = 30
+# Widths from app.db.models. Postgres rejects a longer value, the run exits
+# before last_processed_uid moves, and every later check dies on that same row.
+_SENDER_MAX = 255
+_SUBJECT_MAX = 1000
+_COMPANY_MAX = 255
+_POSITION_MAX = 500
+_STAGE_MAX = 50
+_MODEL_MAX = 100
+_MISSING_SENDER = "(unknown sender)"
 
 logger = logging.getLogger(__name__)
+
+
+def _fit_column(value: str | None, limit: int, *, default: str | None = None) -> str | None:
+    """Strip and clip text to a column width. Blank becomes ``default``."""
+    text = (value or "").strip()
+    if not text:
+        return default
+    return text[:limit]
 
 
 def _resolve_uid_cursor(last_processed_uid: int, imap_timeout_seconds: int) -> int:
@@ -281,6 +298,16 @@ def run(
                     mid,
                 )
 
+            # A missing From is a real message (the parser keeps it). emails.sender
+            # is NOT NULL, so inserting None aborts the run and the cursor never
+            # advances past this UID. The same is true of a header or model string
+            # longer than the column.
+            email_data.sender = _fit_column(email_data.sender, _SENDER_MAX, default=_MISSING_SENDER)
+            email_data.subject = _fit_column(email_data.subject, _SUBJECT_MAX)
+            email_data.company = _fit_column(email_data.company, _COMPANY_MAX)
+            email_data.position = _fit_column(email_data.position, _POSITION_MAX)
+            email_data.stage = _fit_column(email_data.stage, _STAGE_MAX)
+
             email_record = email_repo.create(
                 message_id=email_data.message_id,
                 uid=email_data.uid,
@@ -302,7 +329,7 @@ def run(
                 analysis = analysis_repo.create(
                     email_id=email_record.id,
                     classification=classification,
-                    model_used=model_name,
+                    model_used=_fit_column(str(model_name), _MODEL_MAX, default="unknown"),
                     worker_run_id=worker_run.id,
                 )
 
