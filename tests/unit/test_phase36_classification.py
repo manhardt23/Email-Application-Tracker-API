@@ -2,9 +2,12 @@
 
 from datetime import datetime
 
+import pytest
+
 from app.db.models import Application, Company, Email, EmailAnalysis
 from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification
+from app.llm.errors import LLMProviderError, LLMResponseError
 from app.llm.groq_adapter import _PROMPT as GROQ_PROMPT
 from app.llm.ollama_adapter import _PROMPT as OLLAMA_PROMPT
 from app.services.email_service import EmailData, EmailProcessor
@@ -290,6 +293,97 @@ class TestReconcileFalseNegatives:
         assert email.classify(_ScriptedClassifier(None)) is True
         assert email.stage == "applied"
         assert email.confidence == "medium"
+
+    def test_unreadable_model_reply_does_not_abort_the_batch(self):
+        """One bad JSON reply must not stop later messages in the same check."""
+
+        class _FailsThenClassifies:
+            provider_name = "groq"
+
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def classify_email(self, sender: str, subject: str, body: str):
+                self.calls += 1
+                if self.calls == 1:
+                    raise LLMResponseError("No JSON object found in provider response.")
+                return EmailClassification(
+                    is_application=True,
+                    company="Initech",
+                    position="Analyst",
+                    stage="applied",
+                    confidence="high",
+                )
+
+        ambiguous = EmailData(
+            message_id="<bad@acme.com>",
+            uid="8",
+            sender="recruiter@agency.com",
+            subject="Candidate resume",
+            date=None,
+            body="Please send your resume if you want to be considered a candidate.",
+        )
+        clear = EmailData(
+            message_id="<ok@acme.com>",
+            uid="9",
+            sender="hr@initech.com",
+            subject="Thank you for your application",
+            date=None,
+            body="Thank you for your application to Analyst at Initech.",
+        )
+        processor = EmailProcessor(_FailsThenClassifies())
+        processor.email_list = [ambiguous, clear]
+
+        found = processor.analyze_emails()
+
+        assert ambiguous.is_application is False
+        assert found == [clear]
+        assert clear.is_application is True
+        assert clear.company == "Initech"
+
+    def test_unreadable_model_reply_still_keeps_an_explicit_rejection(self):
+        email = EmailData(
+            message_id="<rej@acme.com>",
+            uid="10",
+            sender="talent@acme.com",
+            subject="Update",
+            date=None,
+            body=(
+                "We regret to inform you that we will not be moving forward "
+                "with your application."
+            ),
+        )
+
+        class _Unreadable:
+            provider_name = "groq"
+
+            def classify_email(self, sender: str, subject: str, body: str):
+                raise LLMResponseError("Invalid JSON in provider response.")
+
+        assert email.classify(_Unreadable()) is True
+        assert email.stage == "rejected"
+        assert email.is_application is True
+
+    def test_provider_outage_still_aborts_classification(self):
+        email = EmailData(
+            message_id="<down@acme.com>",
+            uid="11",
+            sender="hr@acme.com",
+            subject="Thank you for your application",
+            date=None,
+            body="Thank you for your application to Engineer at Acme.",
+        )
+
+        class _Down:
+            provider_name = "groq"
+
+            def classify_email(self, sender: str, subject: str, body: str):
+                raise LLMProviderError("Groq classification failed.")
+
+        processor = EmailProcessor(_Down())
+        processor.email_list = [email]
+        with pytest.raises(LLMProviderError):
+            processor.analyze_emails()
 
     def test_ambiguous_mail_stays_not_an_application_when_the_model_says_no(self):
         email = EmailData(
