@@ -6,6 +6,7 @@ from app.email_client.application_signals import reconcile_classification
 from app.email_client.client import fetch_emails_by_date_range, fetch_recent_emails
 from app.email_client.quick_filter import quick_filter
 from app.llm.base import EmailClassification, LLMClassifier
+from app.llm.errors import LLMResponseError
 
 logger = logging.getLogger(__name__)
 
@@ -47,16 +48,27 @@ class EmailData:
             return False
 
         start = perf_counter()
-        result: EmailClassification | None = classifier.classify_email(
-            self.sender, self.subject, self.body
-        )
+        unreadable = False
+        try:
+            result: EmailClassification | None = classifier.classify_email(
+                self.sender, self.subject, self.body
+            )
+        except LLMResponseError:
+            # This message's reply was not JSON. Raising here fails the whole
+            # check before any row is saved and leaves the UID cursor unchanged,
+            # so every later run fetches the same window and dies on this mail.
+            # Text rules below still accept an explicit rejection or interview.
+            unreadable = True
+            result = None
         latency_ms = (perf_counter() - start) * 1000
         result = reconcile_classification(self.sender, self.subject, self.body, result)
         if result is None:
             logger.warning(
-                "LLM classify provider=%s latency_ms=%.2f outcome=no_classification",
+                "LLM classify provider=%s latency_ms=%.2f uid=%s outcome=%s",
                 provider,
                 latency_ms,
+                self.uid,
+                "unreadable_response" if unreadable else "no_classification",
             )
             self.is_application = False
             return False
