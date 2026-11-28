@@ -18,6 +18,7 @@ from app.worker import (
     EXIT_NO_SLOT,
     EXIT_OK,
     EXIT_PIPELINE,
+    _cursor_recorded_recently,
     _resolve_uid_cursor,
     _validate_config,
     run,
@@ -89,6 +90,89 @@ def test_resolve_uid_cursor_resets_when_tracked_uid_is_stale(mock_latest_uid, mo
 
     assert resolved == 999
     mock_uid_date.assert_called_once_with(123, timeout=30)
+    mock_latest_uid.assert_called_once_with(timeout=30)
+
+
+def test_cursor_recorded_recently_ignores_an_old_message_date():
+    """The saved message can be old on the same day the cursor was written."""
+    assert _cursor_recorded_recently(datetime.now(UTC)) is True
+    assert _cursor_recorded_recently(datetime.now(UTC) - timedelta(days=45)) is False
+    # Naive timestamps from SQLite are UTC wall time.
+    assert _cursor_recorded_recently(datetime.now(UTC).replace(tzinfo=None)) is True
+    assert _cursor_recorded_recently(None) is False
+
+
+@patch("app.worker.get_latest_uid")
+@patch("app.worker.get_uid_received_date")
+@patch("app.worker.get_settings")
+def test_recent_cursor_is_kept_when_saved_message_date_is_old(
+    mock_gs, mock_uid_date, mock_latest_uid
+):
+    """An old Date on a UID saved today must not skip mail that arrives next."""
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    latest = MagicMock()
+    latest.last_processed_uid = 105
+    latest.finished_at = datetime.now(UTC)
+    infra["run_repo"].get_latest_run.return_value = latest
+    mock_uid_date.return_value = datetime.now(UTC) - timedelta(days=45)
+    mock_latest_uid.return_value = 999
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository"), \
+         patch("app.worker.CompanyRepository"), \
+         patch("app.worker.ApplicationRepository"), \
+         patch("app.worker.AnalysisRepository"), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run()
+
+    assert result == EXIT_OK
+    infra["processor"].fetch_emails.assert_called_once_with(
+        50,
+        since_uid=106,
+        from_date=None,
+        to_date=None,
+    )
+    mock_uid_date.assert_not_called()
+    mock_latest_uid.assert_not_called()
+
+
+@patch("app.worker.get_latest_uid")
+@patch("app.worker.get_uid_received_date")
+@patch("app.worker.get_settings")
+def test_cursor_recorded_over_30_days_ago_still_resets(
+    mock_gs, mock_uid_date, mock_latest_uid
+):
+    infra = _patch_worker_infra()
+    mock_gs.return_value = infra["settings"]
+    latest = MagicMock()
+    latest.last_processed_uid = 105
+    latest.finished_at = datetime.now(UTC) - timedelta(days=45)
+    infra["run_repo"].get_latest_run.return_value = latest
+    mock_uid_date.return_value = datetime.now(UTC) - timedelta(days=45)
+    mock_latest_uid.return_value = 999
+
+    with patch("app.worker.models"), \
+         patch("app.worker.SessionLocal", return_value=infra["session"]), \
+         patch("app.worker.WorkerRunRepository", return_value=infra["run_repo"]), \
+         patch("app.worker.EmailRepository"), \
+         patch("app.worker.CompanyRepository"), \
+         patch("app.worker.ApplicationRepository"), \
+         patch("app.worker.AnalysisRepository"), \
+         patch("app.worker.build_classifier"), \
+         patch("app.worker.EmailProcessor", return_value=infra["processor"]):
+        result = run()
+
+    assert result == EXIT_OK
+    infra["processor"].fetch_emails.assert_called_once_with(
+        50,
+        since_uid=1000,
+        from_date=None,
+        to_date=None,
+    )
     mock_latest_uid.assert_called_once_with(timeout=30)
 
 
