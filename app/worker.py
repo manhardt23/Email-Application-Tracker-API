@@ -60,6 +60,25 @@ UID_STALE_DAYS = 30
 logger = logging.getLogger(__name__)
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _cursor_recorded_recently(recorded_at: datetime | None) -> bool:
+    """True when the UID cursor was saved within UID_STALE_DAYS.
+
+    The Date header of the saved message is not that age. A message moved
+    into the inbox, or delivered late, keeps its original Date on a new UID.
+    Treating that Date as a stale cursor jumps to the mailbox head and drops
+    every message that arrived after it.
+    """
+    if not isinstance(recorded_at, datetime):
+        return False
+    return _as_utc(recorded_at) >= datetime.now(UTC) - timedelta(days=UID_STALE_DAYS)
+
+
 def _resolve_uid_cursor(last_processed_uid: int, imap_timeout_seconds: int) -> int:
     """Reset tracked UID to mailbox head when the tracked email is stale/missing."""
     if last_processed_uid <= 0:
@@ -179,13 +198,19 @@ def run(
             if latest_run is not None and latest_run.last_processed_uid is not None
             else 0
         )
-        backfill_mode = backfill_from is not None
-        # Backfill mode is date-window driven; skip UID cursor IMAP lookups.
-        cursor_uid = (
-            last_processed_uid
-            if backfill_mode
-            else _resolve_uid_cursor(last_processed_uid, settings.imap_timeout_seconds)
+        recorded_at = (
+            getattr(latest_run, "finished_at", None) if last_processed_uid > 0 else None
         )
+        backfill_mode = backfill_from is not None
+        # Backfill is date-window driven. A cursor saved in the last 30 days
+        # stays put even when the saved message's Date header is older than
+        # that: the header is when the message was written, not when we
+        # stored the UID. The date lookup still runs for a cursor that itself
+        # has not been updated in 30 days.
+        if backfill_mode or _cursor_recorded_recently(recorded_at):
+            cursor_uid = last_processed_uid
+        else:
+            cursor_uid = _resolve_uid_cursor(last_processed_uid, settings.imap_timeout_seconds)
         since_uid = 1 if backfill_mode else cursor_uid + 1
         highest_uid = cursor_uid
 
